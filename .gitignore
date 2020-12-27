@@ -1,0 +1,4 @@
+quarantine/
+.vscode/
+
+yara-signatures/
