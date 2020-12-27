@@ -14,6 +14,7 @@ var (
 	procGetSystemInfo           = modkernel32.NewProc("GetSystemInfo")
 	procReadProcessMemory       = modkernel32.NewProc("ReadProcessMemory")
 	procVirtualProtect          = modkernel32.NewProc("VirtualProtect")
+	procGetExitCodeProcess      = modkernel32.NewProc("GetExitCodeProcess")
 	procGetProcessImageFileName = modpsapi.NewProc("GetProcessImageFileNameA")
 	procEnumProcessModules      = modpsapi.NewProc("EnumProcessModules")
 	procGetModuleFileNameEx     = modpsapi.NewProc("GetModuleFileNameExA")
@@ -136,4 +137,16 @@ func VirtualProtect(lpAddress unsafe.Pointer, dwSize uintptr, flNewProtect uint3
 		uintptr(flNewProtect),
 		uintptr(lpflOldProtect))
 	return ret > 0
+}
+
+// GetExitCodeProcess is a wrapper for the same WIN32 API function
+// https://docs.microsoft.com/en-us/windows/win32/api/processthreadsapi/nf-processthreadsapi-getexitcodeprocess
+func GetExitCodeProcess(hProcess windows.Handle) uint32 {
+	var lpExitCode uint32 = 0
+	ret, _, _ := syscall.Syscall(procGetExitCodeProcess.Addr(), 2, uintptr(hProcess), uintptr(unsafe.Pointer(&lpExitCode)), 0)
+	if ret != 0 {
+		return lpExitCode
+	}
+
+	return 0
 }

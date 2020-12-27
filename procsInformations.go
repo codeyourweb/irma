@@ -2,7 +2,10 @@ package main
 
 import (
 	"bytes"
+	"crypto/md5"
+	"fmt"
 	"log"
+	"os"
 	"strings"
 	"syscall"
 
@@ -15,18 +18,21 @@ type ProcessInformation struct {
 	ProcessName   string
 	ProcessPath   string
 	ProcessMemory []byte
+	MemoryHash    string
 }
 
 // ListProcess try to get all running processes and dump their memory, return a ProcessInformation slice
-func ListProcess() (procsInfo []ProcessInformation) {
+func ListProcess(verbose bool) (procsInfo []ProcessInformation) {
+	runningPID := os.Getpid()
+
 	procsIds, bytesReturned, err := GetProcessesList()
 	if err != nil {
 		log.Fatal(err)
 	}
 	for i := uint32(0); i < bytesReturned; i++ {
-		if procsIds[i] != 0 {
-			procHandle, err := GetProcessHandle(procsIds[i])
-			if err != nil {
+		if procsIds[i] != 0 && procsIds[i] != uint32(runningPID) {
+			procHandle, err := GetProcessHandle(procsIds[i], windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ)
+			if err != nil && verbose {
 				log.Println("PID", procsIds[i], err)
 			}
 
@@ -36,7 +42,7 @@ func ListProcess() (procsInfo []ProcessInformation) {
 					for _, moduleHandle := range modules {
 						if moduleHandle != 0 {
 							moduleRawName, err := GetModuleFileNameEx(procHandle, moduleHandle, 512)
-							if err != nil {
+							if err != nil && verbose {
 								log.Println(err)
 							}
 							moduleRawName = bytes.Trim(moduleRawName, "\x00")
@@ -44,9 +50,9 @@ func ListProcess() (procsInfo []ProcessInformation) {
 							moduleFileName := modulePath[len(modulePath)-1]
 
 							if procFilename == moduleFileName {
-								memdump := DumpModuleMemory(procHandle, moduleHandle)
+								memdump := DumpModuleMemory(procHandle, moduleHandle, verbose)
 								if len(memdump) > 0 {
-									proc := ProcessInformation{PID: procsIds[i], ProcessName: procFilename, ProcessPath: string(moduleRawName), ProcessMemory: memdump}
+									proc := ProcessInformation{PID: procsIds[i], ProcessName: procFilename, ProcessPath: string(moduleRawName), ProcessMemory: memdump, MemoryHash: fmt.Sprintf("%x", md5.Sum(memdump))}
 									procsInfo = append(procsInfo, proc)
 								}
 							}
@@ -60,6 +66,22 @@ func ListProcess() (procsInfo []ProcessInformation) {
 	return procsInfo
 }
 
+// KillProcessByID try to kill the specified PID
+func KillProcessByID(procID uint32, verbose bool) (err error) {
+	hProc, err := GetProcessHandle(procID, windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_TERMINATE)
+	if err != nil && verbose {
+		log.Println("PID", procID, err)
+	}
+
+	exitCode := GetExitCodeProcess(hProc)
+	err = windows.TerminateProcess(hProc, exitCode)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // GetProcessesList return PID from running processes
 func GetProcessesList() (procsIds []uint32, bytesReturned uint32, err error) {
 	procsIds = make([]uint32, 2048)
@@ -68,8 +90,8 @@ func GetProcessesList() (procsIds []uint32, bytesReturned uint32, err error) {
 }
 
 // GetProcessHandle return the process handle from the specified PID
-func GetProcessHandle(pid uint32) (handle windows.Handle, err error) {
-	handle, err = windows.OpenProcess(windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ, false, pid)
+func GetProcessHandle(pid uint32, desiredAccess uint32) (handle windows.Handle, err error) {
+	handle, err = windows.OpenProcess(desiredAccess, false, pid)
 	return handle, err
 }
 
@@ -93,14 +115,14 @@ func GetProcessModulesHandles(procHandle windows.Handle) (processFilename string
 }
 
 // DumpModuleMemory dump a process module memory and return it as a byte slice
-func DumpModuleMemory(procHandle windows.Handle, modHandle syscall.Handle) []byte {
+func DumpModuleMemory(procHandle windows.Handle, modHandle syscall.Handle, verbose bool) []byte {
 	moduleInfos, err := GetModuleInformation(procHandle, modHandle)
-	if err != nil {
+	if err != nil && verbose {
 		log.Println(err)
 	}
 
 	memdump, err := ReadProcessMemory(procHandle, moduleInfos.BaseOfDll, uintptr(moduleInfos.SizeOfImage))
-	if err != nil {
+	if err != nil && verbose {
 		log.Println(err)
 	}
 
