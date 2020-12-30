@@ -2,8 +2,11 @@ package main
 
 import (
 	"fmt"
+	"log"
 	"strings"
+	"time"
 
+	"github.com/hillu/go-yara"
 	"golang.org/x/sys/windows/registry"
 )
 
@@ -13,6 +16,25 @@ type RegistryValue struct {
 	subKey    string
 	valueName string
 	value     string
+}
+
+// RegistryAnalysisRoutine analyse registry persistence keys every 15 seconds
+func RegistryAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+	for true {
+		values, errors := EnumRegistryPeristence()
+		for _, err := range errors {
+			log.Println(err)
+		}
+
+		for _, k := range values {
+			paths := FormatPathFromComplexString(k.value)
+			for _, p := range paths {
+				FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules)
+			}
+		}
+
+		time.Sleep(15 * time.Second)
+	}
 }
 
 // EnumRegistryPeristence get all the potential registry values used for persistence

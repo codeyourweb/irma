@@ -4,9 +4,30 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"time"
 
+	"github.com/hillu/go-yara"
 	golnk "github.com/parsiya/golnk"
 )
+
+// StartMenuAnalysisRoutine analyse system artefacts every 15 seconds
+func StartMenuAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+	for true {
+
+		lnk, errors := ListStartMenuLnkPersistence()
+		if errors != nil {
+			for _, err := range errors {
+				log.Println(err)
+			}
+		}
+
+		for _, p := range lnk {
+			FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules)
+		}
+
+		time.Sleep(15 * time.Second)
+	}
+}
 
 // ListStartMenuFolders return a []string of all available StartMenu folders
 func ListStartMenuFolders() (startMenu []string, err error) {
@@ -39,12 +60,11 @@ func ListStartMenuLnkPersistence() (exePath []string, errors []error) {
 		files, err := RetrivesFilesFromUserPath(path, true, []string{".lnk"}, false)
 
 		if err != nil {
-			fmt.Errorf("%s - %s", path, err)
+			errors = append(errors, fmt.Errorf("%s - %s", path, err.Error()))
 		}
 
 		for _, p := range files {
 			lnk, lnkErr := golnk.File(p)
-			// Print errors and move on to the next file.
 			if lnkErr != nil {
 				errors = append(errors, fmt.Errorf("%s - Lnk parse error", p))
 				continue
