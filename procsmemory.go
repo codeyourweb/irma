@@ -21,7 +21,6 @@ type ProcessInformation struct {
 	ProcessName   string
 	ProcessPath   string
 	ProcessMemory []byte
-	MemoryHash    string
 }
 
 // MemoryAnalysisRoutine analyse processes memory every 5 seconds
@@ -34,7 +33,7 @@ func MemoryAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pAggres
 		if len(pDump) > 0 {
 			for _, proc := range procs {
 				if err := WriteProcessMemoryToFile(pDump, proc.ProcessName+fmt.Sprint(proc.PID)+".dmp", proc.ProcessMemory); err != nil && pVerbose {
-					log.Println(err)
+					log.Println("[ERROR]", err)
 				}
 			}
 			os.Exit(0)
@@ -46,7 +45,7 @@ func MemoryAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pAggres
 			if len(result) == 0 {
 				procPE, err := ioutil.ReadFile(proc.ProcessPath)
 				if err != nil && pVerbose {
-					log.Println(err)
+					log.Println("[ERROR]", err)
 				}
 				result = PerformYaraScan(procPE, rules, pVerbose)
 			}
@@ -59,21 +58,21 @@ func MemoryAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pAggres
 
 				// logging
 				for _, match := range result {
-					log.Println("[YARA MATCH]", proc.ProcessName, "PID:", fmt.Sprint(proc.PID), match.Namespace, match.Rule)
+					log.Println("[INFO]", "YARA MATCH", proc.ProcessName, "PID:", fmt.Sprint(proc.PID), match.Namespace, match.Rule)
 				}
 
 				// dump matching process to quarantine
 				if len(pQuarantine) > 0 {
-					log.Println("[ACTION]", "Dumping PID", proc.PID)
+					log.Println("[INFO]", "DUMPING PID", proc.PID)
 					err := QuarantineProcess(proc, pQuarantine)
 					if err != nil && pVerbose {
-						log.Println("Cannot quarantine PID", proc.PID, err)
+						log.Println("[ERROR]", "Cannot quarantine PID", proc.PID, err)
 					}
 				}
 
 				// killing process
 				if pKill {
-					log.Println("[ACTION]", "Killing PID", proc.PID)
+					log.Println("[INFO]", "KILLING PID", proc.PID)
 					KillProcessByID(proc.PID, pVerbose)
 				}
 
@@ -95,7 +94,7 @@ func ListProcess(verbose bool) (procsInfo []ProcessInformation) {
 		if procsIds[i] != 0 && procsIds[i] != uint32(runningPID) {
 			procHandle, err := GetProcessHandle(procsIds[i], windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ)
 			if err != nil && verbose {
-				log.Println("PID", procsIds[i], err)
+				log.Println("[ERROR]", "PID", procsIds[i], err)
 			}
 
 			if err == nil && procHandle > 0 {
@@ -105,7 +104,7 @@ func ListProcess(verbose bool) (procsInfo []ProcessInformation) {
 						if moduleHandle != 0 {
 							moduleRawName, err := GetModuleFileNameEx(procHandle, moduleHandle, 512)
 							if err != nil && verbose {
-								log.Println(err)
+								log.Println("[ERROR]", err)
 							}
 							moduleRawName = bytes.Trim(moduleRawName, "\x00")
 							modulePath := strings.Split(string(moduleRawName), "\\")
@@ -114,8 +113,11 @@ func ListProcess(verbose bool) (procsInfo []ProcessInformation) {
 							if procFilename == moduleFileName {
 								memdump := DumpModuleMemory(procHandle, moduleHandle, verbose)
 								if len(memdump) > 0 {
-									proc := ProcessInformation{PID: procsIds[i], ProcessName: procFilename, ProcessPath: string(moduleRawName), ProcessMemory: memdump, MemoryHash: fmt.Sprintf("%x", md5.Sum(memdump))}
-									procsInfo = append(procsInfo, proc)
+									proc := ProcessInformation{PID: procsIds[i], ProcessName: procFilename, ProcessPath: string(moduleRawName), ProcessMemory: memdump}
+									if !StringInSlice(fmt.Sprintf("%x", md5.Sum(memdump)), memoryscanHistory) {
+										procsInfo = append(procsInfo, proc)
+										memoryscanHistory = append(memoryscanHistory, fmt.Sprintf("%x", md5.Sum(memdump)))
+									}
 								}
 							}
 						}
@@ -132,7 +134,7 @@ func ListProcess(verbose bool) (procsInfo []ProcessInformation) {
 func KillProcessByID(procID uint32, verbose bool) (err error) {
 	hProc, err := GetProcessHandle(procID, windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_TERMINATE)
 	if err != nil && verbose {
-		log.Println("PID", procID, err)
+		log.Println("[ERROR]", "PID", procID, err)
 	}
 
 	exitCode := GetExitCodeProcess(hProc)
@@ -180,12 +182,12 @@ func GetProcessModulesHandles(procHandle windows.Handle) (processFilename string
 func DumpModuleMemory(procHandle windows.Handle, modHandle syscall.Handle, verbose bool) []byte {
 	moduleInfos, err := GetModuleInformation(procHandle, modHandle)
 	if err != nil && verbose {
-		log.Println(err)
+		log.Println("[ERROR]", err)
 	}
 
 	memdump, err := ReadProcessMemory(procHandle, moduleInfos.BaseOfDll, uintptr(moduleInfos.SizeOfImage))
 	if err != nil && verbose {
-		log.Println(err)
+		log.Println("[ERROR]", err)
 	}
 
 	memdump = bytes.Trim(memdump, "\x00")

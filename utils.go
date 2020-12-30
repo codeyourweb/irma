@@ -27,27 +27,27 @@ func NotifyUser(title string, message string) {
 // SpawnFakeProcesses drop fake analysis process
 func SpawnFakeProcesses(verbose bool) {
 	if err := SpawnFakeProcess("procmon.exe"); err != nil && verbose {
-		log.Println(err)
+		log.Println("[ERROR]", err)
 	}
 	if err := SpawnFakeProcess("wireshark.exe"); err != nil && verbose {
-		log.Println(err)
+		log.Println("[ERROR]", err)
 	}
 	if err := SpawnFakeProcess("tcpdump.exe"); err != nil && verbose {
-		log.Println(err)
+		log.Println("[ERROR]", err)
 	}
 	if err := SpawnFakeProcess("sysmon.exe"); err != nil && verbose {
-		log.Println(err)
+		log.Println("[ERROR]", err)
 	}
 	if err := SpawnFakeProcess("sysmon64.exe"); err != nil && verbose {
-		log.Println(err)
+		log.Println("[ERROR]", err)
 	}
 	if err := SpawnFakeProcess("x86dbg.exe"); err != nil && verbose {
-		log.Println(err)
+		log.Println("[ERROR]", err)
 	}
 	if err := SpawnFakeProcess("x64dbg.exe"); err != nil && verbose {
-		log.Println(err)
+		log.Println("[ERROR]", err)
 	}
 	if err := SpawnFakeProcess("inetsim.exe"); err != nil && verbose {
-		log.Println(err)
+		log.Println("[ERROR]", err)
 	}
 }

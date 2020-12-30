@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/md5"
 	"crypto/rc4"
 	b64 "encoding/base64"
 	"errors"
@@ -61,36 +62,46 @@ func ListUserWorkspaceFiles() (files []string) {
 
 // FileAnalysis sub-routine for file analysis (used in registry / task scheduler / startmenu scan)
 func FileAnalysis(path string, pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
-	if pVerbose {
-		log.Println("[INFO] Analyzing", path)
-	}
+	var err error
+	var content []byte
+	var result yara.MatchRules
 
-	content, err := ioutil.ReadFile(path)
+	content, err = ioutil.ReadFile(path)
 	if err != nil {
 		log.Println(path, err)
 	}
 
-	result, err := YaraScan(content, rules)
-	if len(result) > 0 {
-		// windows notifications
-		if pNotifications {
-			NotifyUser("YARA match", path+" match "+fmt.Sprint(len(result))+" rules")
+	fileHash := fmt.Sprintf("%x", md5.Sum(content))
+	if !StringInSlice(fileHash, filescanHistory) {
+		if pVerbose {
+			log.Println("[INFO] Analyzing", path)
 		}
 
-		// logging
-		for _, match := range result {
-			log.Println("[YARA MATCH]", path, match.Namespace, match.Rule)
-		}
+		result, err = YaraScan(content, rules)
+		if len(result) > 0 {
+			// windows notifications
+			if pNotifications {
+				NotifyUser("YARA match", path+" match "+fmt.Sprint(len(result))+" rules")
+			}
 
-		// dump matching process to quarantine
-		if len(pQuarantine) > 0 {
-			log.Println("[ACTION]", "Dumping file", path)
-			err := QuarantineFile(content, filepath.Base(path), pQuarantine)
-			if err != nil && pVerbose {
-				log.Println("Cannot quarantine file", path, err)
+			// logging
+			for _, match := range result {
+				log.Println("[INFO]", "YARA MATCH", path, match.Namespace, match.Rule)
+			}
+
+			// dump matching process to quarantine
+			if len(pQuarantine) > 0 {
+				log.Println("[INFO]", "DUMPING FILE", path)
+				err := QuarantineFile(content, filepath.Base(path), pQuarantine)
+				if err != nil && pVerbose {
+					log.Println("[ERROR]", "Cannot quarantine file", path, err)
+				}
 			}
 		}
+
+		filescanHistory = append(filescanHistory, fileHash)
 	}
+
 }
 
 // ListEnvironmentPathFiles list all files in PATH directories
