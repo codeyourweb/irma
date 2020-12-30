@@ -5,13 +5,36 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/hillu/go-yara"
 )
 
-// AnalyseRawDataForYaraMatch use libyara to retrieves match from the loaded ruleset
-func AnalyseRawDataForYaraMatch(data []byte) bool {
-	return true
+// PerformYaraScan use provided YARA rules and search for match in the given byte slice
+func PerformYaraScan(data []byte, rules *yara.Rules, verbose bool) yara.MatchRules {
+	result, err := YaraScan(data, rules)
+	if err != nil && verbose {
+		log.Println(err)
+	}
+
+	return result
+}
+
+// SearchForYaraFiles search *.yar file by walking recursively from specified input path
+func SearchForYaraFiles(path string) (rules []string) {
+	filepath.Walk(path, func(walk string, info os.FileInfo, err error) error {
+		if err != nil {
+			log.Println(err)
+		}
+
+		if err == nil && !info.IsDir() && info.Size() > 0 && len(filepath.Ext(walk)) > 0 && strings.ToLower(filepath.Ext(walk)) == ".yar" {
+			rules = append(rules, walk)
+		}
+
+		return nil
+	})
+
+	return rules
 }
 
 // LoadYaraRules compile yara rules from specified paths and return a pointer to the yara compiler

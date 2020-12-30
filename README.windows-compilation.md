@@ -1,7 +1,7 @@
 
-# Installing _irma_ on Windows
+# Installing IRMA on Windows
 
-_irma_ can be installed on a Windows platform but it's a little bit tricky cause it's strongly dependant of go-yara and CGO. Here's a little documentation to guide you step by step: 
+_IRMA_ can be installed on a Windows platform but it's a little bit tricky cause it's strongly dependant of go-yara and CGO. Here's a little documentation to guide you step by step: 
 
 ## Before installation
 
@@ -16,7 +16,7 @@ For the configurations and examples below, my install paths are:
 
 ## Install msys2 and dependencies:
 
-First of all, note that you won't be able to get _irma_ working if the dependencies are compiled with another compilator than GCC. There is currently some problems with CGO when external libraries are compiled with Visual C++, so no need to install Visual Studio or vcpkg.
+First of all, note that you won't be able to get _IRMA_ working if the dependencies are compiled with another compilator than GCC. There is currently some problems with CGO when external libraries are compiled with Visual C++, so no need to install Visual Studio or vcpkg.
 
 * Download msys2 [from the official website](https://www.msys2.org/) and install it
 * there, you will find two distincts binaries shorcut "MSYS2 MSYS" and "MSYS2 MinGW 64bits". Please launch this second one.
@@ -25,7 +25,7 @@ First of all, note that you won't be able to get _irma_ working if the dependenc
 
 ## Download and compile libyara
 
-It's strongly adviced NOT to clone VirusTotal's YARA repository but download the source code of the latest release. If you compile libyara from the latest commit, it could generate some side effect when linking this library with _irma_ and GCO.
+It's strongly adviced NOT to clone VirusTotal's YARA repository but download the source code of the latest release. If you compile libyara from the latest commit, it could generate some side effect when linking this library with _IRMA_ and GCO.
 
 * Download latest VirusTotal release source [from here](https://github.com/VirusTotal/yara/releases)
 * unzip the folder in a directory without space and special char
@@ -34,7 +34,7 @@ It's strongly adviced NOT to clone VirusTotal's YARA repository but download the
 
 ## Configure your OS
 
-With this step, you won't need to launch use mingw terminal anymore and you will be able to use Go to install _irma_ and compile your projects directly from Windows cmd / powershell.
+With this step, you won't need to launch use mingw terminal anymore and you will be able to use Go to install _IRMA_ and compile your projects directly from Windows cmd / powershell.
 
 Ensure to have the following as system environment variables (not user env vars. If not, create them:
 ```
@@ -52,15 +52,6 @@ Ensure you have got the following user environment var (not system not):
 
 Note that paths be written with slashs and not backslash. As i already said, don't use path with spaces or special characters.
 
-## Install _irma_
-Now, from Windows cmd or Powershell, you can install _irma_: `go get github.com/codeyourweb/irmae`
-
-## Static compilation of your projects 
-when you'll run or build projects using _irma_, it will works on your computer because you have got all these dependencies. If you want build an executable which embed all theses deps, you'll need to:
-1/ Add the following line on top of your main.go file (don't remove the //, it will pass some instructions to cgo):
-```
-// #cgo !yara_no_pkg_config,!yara_static pkg-config: yara
-// #cgo !yara_no_pkg_config,yara_static pkg-config: --static yara
-// #c_irma__no_pkg_config LDFLAGS: -lyara
-```
-2/ Static compile like this: `go build -tags yara_static -a -ldflags '-extldflags "-static"' .` 
+## Download, Install and compile IRMA
+Now, from Windows cmd or Powershell, you can install _IRMA_: `go get github.com/codeyourweb/irma`
+Compilation should be done with: `go build -tags yara_static -a -ldflags '-extldflags "-static"' .` 

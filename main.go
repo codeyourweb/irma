@@ -6,14 +6,11 @@ package main
 
 import (
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"time"
 
 	"github.com/akamensky/argparse"
-	"github.com/gen2brain/beeep"
-	"github.com/hillu/go-yara"
 )
 
 var (
@@ -21,6 +18,8 @@ var (
 	filescanHistory      []string
 	memoryscanHistory    []string
 )
+
+var defaultScannedFileExtensions = []string{".txt", ".csv", ".htm", ".html", ".flv", ".f4v", ".avi", ".3gp", ".3g2", ".3gp2", ".3p2", ".divx", ".mp4", ".mkv", ".mov", ".qt", ".asf", ".wmv", ".rm", ".rmvb", ".vob", ".dat", ".mpg", ".mpeg", ".bik", ".fcs", ".mp3", ".mpeg3", ".flac", ".ape", ".ogg", ".aac", ".m4a", ".wma", ".ac3", ".wav", ".mka", ".rm", ".ra", ".ravb", ".mid", ".midi", ".cda", ".jpg", ".jpe", ".jpeg", ".jff", ".gif", ".png", ".bmp", ".tif", ".tiff", ".emf", ".wmf", ".eps", ".psd", ".cdr", ".swf", ".exe", ".lnk", ".dll", ".ps1", ".scr", ".ocx", ".com", ".sys", ".class", ".o", ".so", ".elf", ".prx", ".vb", ".vbs", ".js", ".bat", ".cmd", ".msi", ".msp", ".deb", ".rpm", ".sh", ".pl", ".dylib", ".doc", ".dot", ".docx", ".dotx", ".docm", ".dotm", ".xsl", ".xls", ".xlsx", ".xltx", ".xlsm", ".xltm", ".xlam", ".xlsb", ".ppt", ".pot", ".pps", ".pptx", ".potx", ".pptm", ".potm", ".ppsx", ".ppsm", ".rtf", ".pdf", ".msg", ".eml", ".vsd", ".vss", ".vst", ".vdx", ".vsx", ".vtx", ".xps", ".oxps", ".one", ".onepkg", ".xsn", ".odt", ".ods", ".odp", ".sxw", ".pub", ".mdb", ".accdb", ".accde", ".accdr", ".accdc", ".chm", ".mht", ".zip", ".7z", ".7-z", ".rar", ".iso", ".cab", ".jar", ".bz", ".bz2", ".tbz", ".tbz2", ".gz", ".tgz", ".arj", ".dmg", ".smi", ".img", ".xar"}
 
 func main() {
 	var err error
@@ -67,122 +66,17 @@ func main() {
 	}
 	fmt.Println(len(rules.GetRules()), "YARA rules compiled")
 
-	go SystemAnalysisRoutine(*pDump, *pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	fmt.Println("Scanning file in Windows temporary folders")
+
+	fmt.Println("Starting routine (Memory / Registry / StartMenu / Task Scheduler / Filesystem)")
+	go MemoryAnalysisRoutine(*pDump, *pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	go RegistryAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	go StartMenuAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	go TaskSchedulerAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	go WindowsFileSystemAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	go UserFileSystemAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+
 	for true {
 		time.Sleep(5 * time.Second)
-	}
-}
-
-// SystemAnalysisRoutine analyse system artefacts every 5 seconds
-func SystemAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
-	for true {
-		// list process information and memory
-		procs := ListProcess(pVerbose)
-
-		// dump process memory and quit the program
-		if len(pDump) > 0 {
-			for _, proc := range procs {
-				if err := WriteProcessMemoryToFile(pDump, proc.ProcessName+fmt.Sprint(proc.PID)+".dmp", proc.ProcessMemory); err != nil && pVerbose {
-					log.Println(err)
-				}
-			}
-			os.Exit(0)
-		}
-
-		// analyze process memory and executable
-		for _, proc := range procs {
-			result := PerformYaraScan(proc.ProcessMemory, rules, pVerbose)
-			if len(result) == 0 {
-				procPE, err := ioutil.ReadFile(proc.ProcessPath)
-				if err != nil && pVerbose {
-					log.Println(err)
-				}
-				result = PerformYaraScan(procPE, rules, pVerbose)
-			}
-
-			if len(result) > 0 {
-				// windows notifications
-				if pNotifications {
-					NotifyUser("YARA match", proc.ProcessName+":"+fmt.Sprint(proc.PID)+" match "+fmt.Sprint(len(result))+" rules")
-				}
-
-				// logging
-				for _, match := range result {
-					log.Println("[YARA MATCH]", proc.ProcessName, "PID:", fmt.Sprint(proc.PID), match.Namespace, match.Rule)
-				}
-
-				// dump matching process to quarantine
-				if len(pQuarantine) > 0 {
-					log.Println("[ACTION]", "Dumping PID", proc.PID)
-					err := QuarantineProcess(proc, pQuarantine)
-					if err != nil && pVerbose {
-						log.Println("Cannot quarantine PID", proc.PID, err)
-					}
-				}
-
-				// killing process
-				if pKill {
-					log.Println("[ACTION]", "Killing PID", proc.PID)
-					KillProcessByID(proc.PID, pVerbose)
-				}
-
-			}
-		}
-
-		// TODO aggressive mode
-		if pAggressive {
-
-		}
-
-		// TODO: routine - analyze file in temporary folder
-
-		time.Sleep(5 * time.Second)
-	}
-
-}
-
-// PerformYaraScan use provided YARA rules and search for match in the given byte slice
-func PerformYaraScan(data []byte, rules *yara.Rules, verbose bool) yara.MatchRules {
-	result, err := YaraScan(data, rules)
-	if err != nil && verbose {
-		log.Println(err)
-	}
-
-	return result
-}
-
-// NotifyUser use Windows notification to instant alert
-func NotifyUser(title string, message string) {
-	err := beeep.Alert(title, message, "")
-	if err != nil {
-		panic(err)
-	}
-}
-
-// SpawnFakeProcesses drop fake analysis process
-func SpawnFakeProcesses(verbose bool) {
-	if err := SpawnFakeProcess("procmon.exe"); err != nil && verbose {
-		log.Println(err)
-	}
-	if err := SpawnFakeProcess("wireshark.exe"); err != nil && verbose {
-		log.Println(err)
-	}
-	if err := SpawnFakeProcess("tcpdump.exe"); err != nil && verbose {
-		log.Println(err)
-	}
-	if err := SpawnFakeProcess("sysmon.exe"); err != nil && verbose {
-		log.Println(err)
-	}
-	if err := SpawnFakeProcess("sysmon64.exe"); err != nil && verbose {
-		log.Println(err)
-	}
-	if err := SpawnFakeProcess("x86dbg.exe"); err != nil && verbose {
-		log.Println(err)
-	}
-	if err := SpawnFakeProcess("x64dbg.exe"); err != nil && verbose {
-		log.Println(err)
-	}
-	if err := SpawnFakeProcess("inetsim.exe"); err != nil && verbose {
-		log.Println(err)
 	}
 }

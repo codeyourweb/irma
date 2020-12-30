@@ -2,10 +2,12 @@ package main
 
 import (
 	"errors"
+	"log"
 	"time"
 
 	ole "github.com/go-ole/go-ole"
 	oleutil "github.com/go-ole/go-ole/oleutil"
+	"github.com/hillu/go-yara"
 )
 
 // Task is a task found in Windows Task Scheduler
@@ -23,6 +25,27 @@ type ExecAction struct {
 	WorkingDirectory string
 	Path             string
 	Arguments        string
+}
+
+// TaskSchedulerAnalysisRoutine analyse Windows Task Scheduler executable every 15 seconds
+func TaskSchedulerAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+	for true {
+		tasks, err := GetTasks()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		for _, t := range tasks {
+			for _, e := range t.ActionList {
+				paths := FormatPathFromComplexString(e.Path)
+				for _, p := range paths {
+					FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules)
+				}
+			}
+		}
+
+		time.Sleep(15 * time.Second)
+	}
 }
 
 // GetTasks returns a list of all scheduled Tasks in Windows Task Scheduler

@@ -4,11 +4,14 @@ import (
 	"bytes"
 	"crypto/md5"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"strings"
 	"syscall"
+	"time"
 
+	"github.com/hillu/go-yara"
 	"golang.org/x/sys/windows"
 )
 
@@ -19,6 +22,65 @@ type ProcessInformation struct {
 	ProcessPath   string
 	ProcessMemory []byte
 	MemoryHash    string
+}
+
+// MemoryAnalysisRoutine analyse processes memory every 5 seconds
+func MemoryAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+	for true {
+		// list process information and memory
+		procs := ListProcess(pVerbose)
+
+		// dump process memory and quit the program
+		if len(pDump) > 0 {
+			for _, proc := range procs {
+				if err := WriteProcessMemoryToFile(pDump, proc.ProcessName+fmt.Sprint(proc.PID)+".dmp", proc.ProcessMemory); err != nil && pVerbose {
+					log.Println(err)
+				}
+			}
+			os.Exit(0)
+		}
+
+		// analyze process memory and executable
+		for _, proc := range procs {
+			result := PerformYaraScan(proc.ProcessMemory, rules, pVerbose)
+			if len(result) == 0 {
+				procPE, err := ioutil.ReadFile(proc.ProcessPath)
+				if err != nil && pVerbose {
+					log.Println(err)
+				}
+				result = PerformYaraScan(procPE, rules, pVerbose)
+			}
+
+			if len(result) > 0 {
+				// windows notifications
+				if pNotifications {
+					NotifyUser("YARA match", proc.ProcessName+":"+fmt.Sprint(proc.PID)+" match "+fmt.Sprint(len(result))+" rules")
+				}
+
+				// logging
+				for _, match := range result {
+					log.Println("[YARA MATCH]", proc.ProcessName, "PID:", fmt.Sprint(proc.PID), match.Namespace, match.Rule)
+				}
+
+				// dump matching process to quarantine
+				if len(pQuarantine) > 0 {
+					log.Println("[ACTION]", "Dumping PID", proc.PID)
+					err := QuarantineProcess(proc, pQuarantine)
+					if err != nil && pVerbose {
+						log.Println("Cannot quarantine PID", proc.PID, err)
+					}
+				}
+
+				// killing process
+				if pKill {
+					log.Println("[ACTION]", "Killing PID", proc.PID)
+					KillProcessByID(proc.PID, pVerbose)
+				}
+
+			}
+		}
+		time.Sleep(5 * time.Second)
+	}
 }
 
 // ListProcess try to get all running processes and dump their memory, return a ProcessInformation slice
@@ -128,4 +190,20 @@ func DumpModuleMemory(procHandle windows.Handle, modHandle syscall.Handle, verbo
 
 	memdump = bytes.Trim(memdump, "\x00")
 	return memdump
+}
+
+// WriteProcessMemoryToFile try to write a byte slice to the specified directory
+func WriteProcessMemoryToFile(path string, file string, data []byte) (err error) {
+	_, err = os.Stat(path)
+	if os.IsNotExist(err) {
+		if err := os.MkdirAll(path, 0600); err != nil {
+			return err
+		}
+	}
+
+	if err := ioutil.WriteFile(path+"/"+file, data, 0644); err != nil {
+		return err
+	}
+
+	return nil
 }

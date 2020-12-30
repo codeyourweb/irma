@@ -11,14 +11,94 @@ import (
 	"path/filepath"
 	"regexp"
 	"strings"
+	"time"
+
+	"github.com/hillu/go-yara"
 )
 
-// ListEnvironmentPathFile list all files in PATH directories
-func ListEnvironmentPathFile() (files []string) {
+// WindowsFileSystemAnalysisRoutine analyse windows filesystem every 300 seconds
+func WindowsFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+	for true {
+		env := ListEnvironmentPathFiles()
+		temp := ListTemporaryFiles()
+
+		for _, p := range env {
+			FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules)
+		}
+
+		for _, p := range temp {
+			FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules)
+		}
+
+		time.Sleep(300 * time.Second)
+	}
+}
+
+// UserFileSystemAnalysisRoutine analyse windows filesystem every 60 seconds
+func UserFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+	for true {
+		files := ListUserWorkspaceFiles()
+
+		for _, p := range files {
+			FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules)
+		}
+		time.Sleep(60 * time.Second)
+	}
+}
+
+// ListUserWorkspaceFiles recursively list all files in USERPROFILE directory
+func ListUserWorkspaceFiles() (files []string) {
+	f, err := RetrivesFilesFromUserPath(os.Getenv("USERPROFILE"), true, defaultScannedFileExtensions, true)
+	if err != nil {
+		log.Println(err)
+	}
+
+	for _, i := range f {
+		files = append(files, i)
+	}
+	return files
+}
+
+// FileAnalysis sub-routine for file analysis (used in registry / task scheduler / startmenu scan)
+func FileAnalysis(path string, pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+	if pVerbose {
+		log.Println("[INFO] Analyzing", path)
+	}
+
+	content, err := ioutil.ReadFile(path)
+	if err != nil {
+		log.Println(path, err)
+	}
+
+	result, err := YaraScan(content, rules)
+	if len(result) > 0 {
+		// windows notifications
+		if pNotifications {
+			NotifyUser("YARA match", path+" match "+fmt.Sprint(len(result))+" rules")
+		}
+
+		// logging
+		for _, match := range result {
+			log.Println("[YARA MATCH]", path, match.Namespace, match.Rule)
+		}
+
+		// dump matching process to quarantine
+		if len(pQuarantine) > 0 {
+			log.Println("[ACTION]", "Dumping file", path)
+			err := QuarantineFile(content, filepath.Base(path), pQuarantine)
+			if err != nil && pVerbose {
+				log.Println("Cannot quarantine file", path, err)
+			}
+		}
+	}
+}
+
+// ListEnvironmentPathFiles list all files in PATH directories
+func ListEnvironmentPathFiles() (files []string) {
 	env := os.Getenv("PATH")
 	paths := strings.Split(env, ";")
 	for _, p := range paths {
-		f, err := RetrivesFilesFromUserPath(p, true, nil, false)
+		f, err := RetrivesFilesFromUserPath(p, true, defaultScannedFileExtensions, false)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -45,7 +125,7 @@ func ListTemporaryFiles() (files []string) {
 	}
 
 	for _, p := range folders {
-		f, err := RetrivesFilesFromUserPath(p, true, nil, true)
+		f, err := RetrivesFilesFromUserPath(p, true, defaultScannedFileExtensions, true)
 		if err != nil {
 			log.Println(err)
 			continue
@@ -142,11 +222,11 @@ func RetrivesFilesFromUserPath(path string, listFiles bool, includeFileExtension
 	return p, nil
 }
 
-// QuarantineProcess dump process executable and memory and cipher them in quarantine folder
-func QuarantineProcess(proc ProcessInformation, path string) (err error) {
-	_, err = os.Stat(path)
+// QuarantineFile copy and encrypt suspicious file
+func QuarantineFile(content []byte, filename string, quarantinePath string) (err error) {
+	_, err = os.Stat(quarantinePath)
 	if os.IsNotExist(err) {
-		if err := os.MkdirAll(path, 0600); err != nil {
+		if err := os.MkdirAll(quarantinePath, 0600); err != nil {
 			return err
 		}
 	}
@@ -155,26 +235,10 @@ func QuarantineProcess(proc ProcessInformation, path string) (err error) {
 	if err != nil {
 		return err
 	}
-	xMem := make([]byte, len(proc.ProcessMemory))
-	c.XORKeyStream(xMem, proc.ProcessMemory)
-	err = ioutil.WriteFile(path+"/"+proc.ProcessName+fmt.Sprint(proc.PID)+".mem.irma", []byte(b64.StdEncoding.EncodeToString(xMem)), 0644)
-	if err != nil {
-		return err
-	}
 
-	procPE, err := ioutil.ReadFile(proc.ProcessPath)
-	if err != nil {
-		return err
-	}
-
-	c, err = rc4.NewCipher([]byte("irma"))
-	if err != nil {
-		return err
-	}
-
-	xPE := make([]byte, len(procPE))
-	c.XORKeyStream(xPE, procPE)
-	err = ioutil.WriteFile(path+"/"+proc.ProcessName+fmt.Sprint(proc.PID)+".pe.irma", []byte(b64.StdEncoding.EncodeToString(xPE)), 0644)
+	xPE := make([]byte, len(content))
+	c.XORKeyStream(xPE, content)
+	err = ioutil.WriteFile(quarantinePath+"/"+filename+".irma", []byte(b64.StdEncoding.EncodeToString(xPE)), 0644)
 	if err != nil {
 		return err
 	}
@@ -182,45 +246,23 @@ func QuarantineProcess(proc ProcessInformation, path string) (err error) {
 	return nil
 }
 
-// SearchForYaraFiles search *.yar file by walking recursively from specified input path
-func SearchForYaraFiles(path string) (rules []string) {
-	filepath.Walk(path, func(walk string, info os.FileInfo, err error) error {
-		if err != nil {
-			log.Println(err)
-		}
+// QuarantineProcess dump process executable and memory and cipher them in quarantine folder
+func QuarantineProcess(proc ProcessInformation, quarantinePath string) (err error) {
 
-		if err == nil && !info.IsDir() && info.Size() > 0 && len(filepath.Ext(walk)) > 0 && strings.ToLower(filepath.Ext(walk)) == ".yar" {
-			rules = append(rules, walk)
-		}
-
-		return nil
-	})
-
-	return rules
-}
-
-// WriteProcessMemoryToFile try to write a byte slice to the specified directory
-func WriteProcessMemoryToFile(path string, file string, data []byte) (err error) {
-	_, err = os.Stat(path)
-	if os.IsNotExist(err) {
-		if err := os.MkdirAll(path, 0600); err != nil {
-			return err
-		}
+	err = QuarantineFile(proc.ProcessMemory, proc.ProcessName+fmt.Sprint(proc.PID)+".mem", quarantinePath)
+	if err != nil {
+		return err
 	}
 
-	if err := ioutil.WriteFile(path+"/"+file, data, 0644); err != nil {
+	procPEContent, err := ioutil.ReadFile(proc.ProcessPath)
+	if err != nil {
+		return err
+	}
+
+	err = QuarantineFile(procPEContent, proc.ProcessName+fmt.Sprint(proc.PID)+".pe", proc.ProcessPath)
+	if err != nil {
 		return err
 	}
 
 	return nil
-}
-
-// StringInSlice check wether or not a string already is inside a specified slice
-func StringInSlice(a string, list []string) bool {
-	for _, b := range list {
-		if b == a {
-			return true
-		}
-	}
-	return false
 }
