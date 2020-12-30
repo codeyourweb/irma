@@ -9,10 +9,17 @@ import (
 	"io/ioutil"
 	"log"
 	"os"
+	"time"
 
 	"github.com/akamensky/argparse"
 	"github.com/gen2brain/beeep"
 	"github.com/hillu/go-yara"
+)
+
+var (
+	notificationsHistory []string
+	filescanHistory      []string
+	memoryscanHistory    []string
 )
 
 func main() {
@@ -44,9 +51,8 @@ func main() {
 	}
 
 	// load yara signature
-	log.Println("Starting IRMA")
+	fmt.Println("[INFO] Starting IRMA")
 	yaraPath := *pYaraPath
-	quarantinePath := *pQuarantine
 	yaraFiles := SearchForYaraFiles(yaraPath)
 	compiler, err := LoadYaraRules(yaraFiles)
 	if err != nil {
@@ -61,66 +67,77 @@ func main() {
 	}
 	fmt.Println(len(rules.GetRules()), "YARA rules compiled")
 
-	// list process information and memory
-	procs := ListProcess(*pVerbose)
-
-	// dump process memory and quit the program
-	if len(*pDump) > 0 {
-		pDump := *pDump
-		for _, proc := range procs {
-			if err := WriteProcessMemoryToFile(pDump, proc.ProcessName+fmt.Sprint(proc.PID)+".dmp", proc.ProcessMemory); err != nil && *pVerbose {
-				log.Println(err)
-			}
-		}
-		os.Exit(0)
+	go SystemAnalysisRoutine(*pDump, *pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	for true {
+		time.Sleep(5 * time.Second)
 	}
+}
 
-	// analyze process memory and executable
-	for _, proc := range procs {
-		result := PerformYaraScan(proc.ProcessMemory, rules, *pVerbose)
-		if len(result) == 0 {
-			procPE, err := ioutil.ReadFile(proc.ProcessPath)
-			if err != nil && *pVerbose {
-				log.Println(err)
-			}
-			result = PerformYaraScan(procPE, rules, *pVerbose)
-		}
+// SystemAnalysisRoutine analyse system artefacts every 5 seconds
+func SystemAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+	for true {
+		// list process information and memory
+		procs := ListProcess(pVerbose)
 
-		if len(result) > 0 {
-			// windows notifications
-			if *pNotifications {
-				NotifyUser("YARA match", proc.ProcessName+":"+fmt.Sprint(proc.PID)+" match "+fmt.Sprint(len(result))+" rules")
-			}
-
-			// logging
-			for _, match := range result {
-				log.Println("[YARA MATCH]", proc.ProcessName, "PID:", fmt.Sprint(proc.PID), match.Namespace, match.Rule)
-			}
-
-			// dump matching process to quarantine
-			if len(quarantinePath) > 0 {
-				log.Println("[ACTION]", "Dumping PID", proc.PID)
-				err := QuarantineProcess(proc, quarantinePath)
-				if err != nil && *pVerbose {
-					log.Println("Cannot quarantine PID", proc.PID, err)
+		// dump process memory and quit the program
+		if len(pDump) > 0 {
+			for _, proc := range procs {
+				if err := WriteProcessMemoryToFile(pDump, proc.ProcessName+fmt.Sprint(proc.PID)+".dmp", proc.ProcessMemory); err != nil && pVerbose {
+					log.Println(err)
 				}
 			}
+			os.Exit(0)
+		}
 
-			// killing process
-			if *pKill {
-				log.Println("[ACTION]", "Killing PID", proc.PID)
-				KillProcessByID(proc.PID, *pVerbose)
+		// analyze process memory and executable
+		for _, proc := range procs {
+			result := PerformYaraScan(proc.ProcessMemory, rules, pVerbose)
+			if len(result) == 0 {
+				procPE, err := ioutil.ReadFile(proc.ProcessPath)
+				if err != nil && pVerbose {
+					log.Println(err)
+				}
+				result = PerformYaraScan(procPE, rules, pVerbose)
 			}
 
+			if len(result) > 0 {
+				// windows notifications
+				if pNotifications {
+					NotifyUser("YARA match", proc.ProcessName+":"+fmt.Sprint(proc.PID)+" match "+fmt.Sprint(len(result))+" rules")
+				}
+
+				// logging
+				for _, match := range result {
+					log.Println("[YARA MATCH]", proc.ProcessName, "PID:", fmt.Sprint(proc.PID), match.Namespace, match.Rule)
+				}
+
+				// dump matching process to quarantine
+				if len(pQuarantine) > 0 {
+					log.Println("[ACTION]", "Dumping PID", proc.PID)
+					err := QuarantineProcess(proc, pQuarantine)
+					if err != nil && pVerbose {
+						log.Println("Cannot quarantine PID", proc.PID, err)
+					}
+				}
+
+				// killing process
+				if pKill {
+					log.Println("[ACTION]", "Killing PID", proc.PID)
+					KillProcessByID(proc.PID, pVerbose)
+				}
+
+			}
 		}
+
+		// TODO aggressive mode
+		if pAggressive {
+
+		}
+
+		// TODO: routine - analyze file in temporary folder
+
+		time.Sleep(5 * time.Second)
 	}
-
-	// TODO aggressive mode
-	if *pAggressive {
-
-	}
-
-	// TODO: routine - analyze file in temporary folder
 
 }
 

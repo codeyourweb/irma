@@ -3,13 +3,144 @@ package main
 import (
 	"crypto/rc4"
 	b64 "encoding/base64"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
+
+// ListEnvironmentPathFile list all files in PATH directories
+func ListEnvironmentPathFile() (files []string) {
+	env := os.Getenv("PATH")
+	paths := strings.Split(env, ";")
+	for _, p := range paths {
+		f, err := RetrivesFilesFromUserPath(p, true, nil, false)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		for _, i := range f {
+			files = append(files, i)
+		}
+	}
+
+	return files
+}
+
+// ListTemporaryFiles list all files in TEMP / TMP / %SystemRoot%\Temp
+func ListTemporaryFiles() (files []string) {
+
+	var folders = []string{os.Getenv("TEMP")}
+	if os.Getenv("TMP") != os.Getenv("TEMP") {
+		folders = append(folders, os.Getenv("TMP"))
+	}
+
+	if os.Getenv("SystemRoot")+`\Temp` != os.Getenv("TEMP") {
+		folders = append(folders, os.Getenv("SystemRoot")+`\Temp`)
+	}
+
+	for _, p := range folders {
+		f, err := RetrivesFilesFromUserPath(p, true, nil, true)
+		if err != nil {
+			log.Println(err)
+			continue
+		}
+
+		for _, i := range f {
+			files = append(files, i)
+		}
+	}
+
+	return files
+}
+
+// FormatPathFromComplexString search for file/directory path and remove environments variables, quotes and extra parameters
+func FormatPathFromComplexString(command string) (paths []string) {
+	var buffer []string
+
+	// quoted path
+	if strings.Contains(command, `"`) || strings.Contains(command, `'`) {
+		re := regexp.MustCompile(`[\'\"](.+)[\'\"]`)
+		matches := re.FindStringSubmatch(command)
+		for i := range matches {
+			if i != 0 {
+				buffer = append(buffer, matches[i])
+			}
+		}
+	} else {
+		for _, i := range strings.Split(strings.Replace(command, ",", "", -1), " ") {
+			buffer = append(buffer, i)
+		}
+
+	}
+
+	for _, item := range buffer {
+		// environment variables
+		if strings.Contains(command, `%`) {
+			re := regexp.MustCompile(`%(\w+)%`)
+			res := re.FindStringSubmatch(item)
+			for i := range res {
+				item = strings.Replace(item, "%"+res[i]+"%", os.Getenv(res[i]), -1)
+			}
+		}
+
+		// check if file exists
+		if _, err := os.Stat(item); !os.IsNotExist(err) {
+			paths = append(paths, item)
+		}
+	}
+
+	return paths
+}
+
+// RetrivesFilesFromUserPath return a []string of available files from given path (includeFileExtensions is available only if listFiles is true)
+func RetrivesFilesFromUserPath(path string, listFiles bool, includeFileExtensions []string, recursive bool) ([]string, error) {
+	var p []string
+
+	info, err := os.Stat(path)
+	if os.IsNotExist(err) {
+		return []string{}, errors.New("Input file not found")
+	}
+
+	if !info.IsDir() {
+		p = append(p, path)
+	} else {
+		if !recursive {
+			files, err := ioutil.ReadDir(path)
+			if err != nil {
+				return []string{}, err
+			}
+			for _, f := range files {
+				if !(f.IsDir() == listFiles) && (len(includeFileExtensions) == 0 || StringInSlice(filepath.Ext(f.Name()), includeFileExtensions)) {
+					p = append(p, path+string(os.PathSeparator)+f.Name())
+				}
+			}
+		} else {
+			err := filepath.Walk(path, func(walk string, info os.FileInfo, err error) error {
+				if err != nil {
+					log.Println(err)
+				}
+
+				if err == nil && !(info.IsDir() == listFiles) && (len(includeFileExtensions) == 0 || StringInSlice(filepath.Ext(walk), includeFileExtensions)) {
+					p = append(p, walk)
+				}
+
+				return nil
+			})
+
+			if err != nil {
+				log.Println(err)
+			}
+		}
+	}
+
+	return p, nil
+}
 
 // QuarantineProcess dump process executable and memory and cipher them in quarantine folder
 func QuarantineProcess(proc ProcessInformation, path string) (err error) {
