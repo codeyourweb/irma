@@ -14,7 +14,7 @@ import (
 func PerformYaraScan(data []byte, rules *yara.Rules, verbose bool) yara.MatchRules {
 	result, err := YaraScan(data, rules)
 	if err != nil && verbose {
-		log.Println(err)
+		log.Println("[ERROR]", err)
 	}
 
 	return result
@@ -47,12 +47,12 @@ func LoadYaraRules(path []string) (compiler *yara.Compiler, err error) {
 	for _, dir := range path {
 		f, err := os.Open(dir)
 		if err != nil {
-			log.Println("Could not open rule file ", dir, err)
+			log.Println("[ERROR]", "Could not open rule file ", dir, err)
 		}
 
 		namespace := filepath.Base(dir)[:len(filepath.Base(dir))-4]
 		if err = compiler.AddFile(f, namespace); err != nil {
-			log.Println("Could not load rule file ", dir, err)
+			log.Println("[ERROR]", "Could not load rule file ", dir, err)
 		}
 		f.Close()
 	}

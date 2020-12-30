@@ -17,7 +17,7 @@ func StartMenuAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, 
 		lnk, errors := ListStartMenuLnkPersistence()
 		if errors != nil {
 			for _, err := range errors {
-				log.Println(err)
+				log.Println("[ERROR]", err)
 			}
 		}
 

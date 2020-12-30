@@ -23,7 +23,7 @@ func RegistryAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, p
 	for true {
 		values, errors := EnumRegistryPeristence()
 		for _, err := range errors {
-			log.Println(err)
+			log.Println("[ERROR]", err)
 		}
 
 		for _, k := range values {

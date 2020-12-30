@@ -32,7 +32,7 @@ func TaskSchedulerAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bo
 	for true {
 		tasks, err := GetTasks()
 		if err != nil {
-			log.Fatal(err)
+			log.Println("[ERROR]", err)
 		}
 
 		for _, t := range tasks {

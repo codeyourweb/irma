@@ -23,6 +23,7 @@ var defaultScannedFileExtensions = []string{".txt", ".csv", ".htm", ".html", ".f
 
 func main() {
 	var err error
+	log.SetOutput(os.Stdout)
 
 	// create mutex to avoid program running multiple instances
 	if _, err = CreateMutex("irmaBinMutex"); err != nil {
@@ -50,33 +51,33 @@ func main() {
 	}
 
 	// load yara signature
-	fmt.Println("[INFO] Starting IRMA")
+	log.Println("[INFO] Starting IRMA")
 	yaraPath := *pYaraPath
 	yaraFiles := SearchForYaraFiles(yaraPath)
 	compiler, err := LoadYaraRules(yaraFiles)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println("Loading ", len(yaraFiles), "YARA files")
+	log.Println("Loading ", len(yaraFiles), "YARA files")
 
 	// compile yara rules
 	rules, err := CompileRules(compiler)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Println(len(rules.GetRules()), "YARA rules compiled")
+	log.Println(len(rules.GetRules()), "YARA rules compiled")
 
-	fmt.Println("Scanning file in Windows temporary folders")
+	log.Println("Scanning file in Windows temporary folders")
 
-	fmt.Println("Starting routine (Memory / Registry / StartMenu / Task Scheduler / Filesystem)")
+	log.Println("Starting routine (Memory / Registry / StartMenu / Task Scheduler / Filesystem)")
 	go MemoryAnalysisRoutine(*pDump, *pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	go RegistryAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	go StartMenuAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	go TaskSchedulerAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	go WindowsFileSystemAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	go UserFileSystemAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	//go RegistryAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	//go StartMenuAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	//go TaskSchedulerAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	//go WindowsFileSystemAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	//go UserFileSystemAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
 
 	for true {
-		time.Sleep(5 * time.Second)
+		time.Sleep(3600 * time.Second)
 	}
 }
