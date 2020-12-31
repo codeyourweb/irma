@@ -51,7 +51,7 @@ func FileAnalysis(path string, pQuarantine string, pKill bool, pAggressive bool,
 			// dump matching file to quarantine
 			if len(pQuarantine) > 0 {
 				log.Println("[INFO]", "Dumping file", path)
-				err := QuarantineFile(filepath.Base(path), pQuarantine)
+				err := QuarantineFile(path, pQuarantine)
 				if err != nil {
 					log.Println("[ERROR]", "Cannot quarantine file", path, err)
 				}
