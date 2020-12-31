@@ -31,7 +31,7 @@ type ExecAction struct {
 func TaskSchedulerAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
 	for true {
 		tasks, err := GetTasks()
-		if err != nil {
+		if err != nil && pVerbose {
 			log.Println("[ERROR]", err)
 		}
 
@@ -39,7 +39,7 @@ func TaskSchedulerAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bo
 			for _, e := range t.ActionList {
 				paths := FormatPathFromComplexString(e.Path)
 				for _, p := range paths {
-					FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules)
+					FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules, "TASKS")
 				}
 			}
 		}

@@ -51,31 +51,28 @@ func main() {
 	}
 
 	// load yara signature
-	log.Println("[INFO] Starting IRMA")
+	log.Println("[INIT] Starting IRMA")
 	yaraPath := *pYaraPath
-	yaraFiles := SearchForYaraFiles(yaraPath)
-	compiler, err := LoadYaraRules(yaraFiles)
+	yaraFiles := SearchForYaraFiles(yaraPath, *pVerbose)
+	compiler, err := LoadYaraRules(yaraFiles, *pVerbose)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println("Loading ", len(yaraFiles), "YARA files")
+	log.Println("[INIT] Loading ", len(yaraFiles), "YARA files")
 
 	// compile yara rules
 	rules, err := CompileRules(compiler)
 	if err != nil {
 		log.Fatal(err)
 	}
-	log.Println(len(rules.GetRules()), "YARA rules compiled")
-
-	log.Println("Scanning file in Windows temporary folders")
-
-	log.Println("Starting routine (Memory / Registry / StartMenu / Task Scheduler / Filesystem)")
+	log.Println("[INIT]", len(rules.GetRules()), "YARA rules compiled")
+	log.Println("[INFO] Start scanning Memory / Registry / StartMenu / Task Scheduler / Filesystem")
 	go MemoryAnalysisRoutine(*pDump, *pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	//go RegistryAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	//go StartMenuAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	//go TaskSchedulerAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	//go WindowsFileSystemAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	//go UserFileSystemAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	go RegistryAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	go StartMenuAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	go TaskSchedulerAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	go WindowsFileSystemAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	go UserFileSystemAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
 
 	for true {
 		time.Sleep(3600 * time.Second)
