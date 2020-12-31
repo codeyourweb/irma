@@ -31,9 +31,11 @@ _go-yara_ and CGO compilation. You'll find a detailed documentation [here](READM
 
 ### Usage 
 ```
-usage: IRMA [-h|--help] [-y|--yara-rules "<value>"] [-d|--dump "<value>"]
+usage: irma [-h|--help] [-y|--yara-rules "<value>"] [-d|--dump "<value>"]
             [-q|--quarantine "<value>"] [-k|--kill] [-f|--faker]
-            [-a|--aggressive] [-n|--notifications] [-v|--verbose]
+            [-n|--notifications] [-v|--verbose]
+
+            Incident Response - Minimal Analysis
 
 Arguments:
 
@@ -42,16 +44,14 @@ Arguments:
                        recursively). Default: ./yara-signatures
   -d  --dump           Dump all running process to the specified directory
   -q  --quarantine     Specify path to store matching artefacts in quarantine
-                      (Base64/RC4 with key: IRMA
+                       (Base64/RC4 with key: irma
   -k  --kill           Kill suspicious process ID (without removing process
                        binary)
   -f  --faker          Spawn fake processes such as wireshark / procmon /
                        procdump / x64dbg
-  -a  --aggressive     Aggressive mode - remove suscpicious process executable
-                       / track and remove PPID / remove schedule task & regkey
-                       persistence
   -n  --notifications  Use Windows notifications when a file or memory stream
                        match your YARA rules
+  -v  --verbose        Display every error and information messages
 ``` 
 
 ## About this project and future versions

@@ -28,6 +28,7 @@ func main() {
 
 	// create mutex to avoid program running multiple instances
 	if _, err = CreateMutex("irmaBinMutex"); err != nil {
+		log.Println("Only one instance or irma can be launched")
 		os.Exit(1)
 	}
 
@@ -37,9 +38,12 @@ func main() {
 	pQuarantine := parser.String("q", "quarantine", &argparse.Options{Required: false, Help: "Specify path to store matching artefacts in quarantine (Base64/RC4 with key: irma"})
 	pKill := parser.Flag("k", "kill", &argparse.Options{Required: false, Help: "Kill suspicious process ID (without removing process binary)"})
 	pFaker := parser.Flag("f", "faker", &argparse.Options{Required: false, Help: "Spawn fake processes such as wireshark / procmon / procdump / x64dbg"})
-	pAggressive := parser.Flag("a", "aggressive", &argparse.Options{Required: false, Help: "Aggressive mode - remove suscpicious process executable / track and remove suspicious PPID / remove schedule task & regkey persistence"})
 	pNotifications := parser.Flag("n", "notifications", &argparse.Options{Required: false, Help: "Use Windows notifications when a file or memory stream match your YARA rules"})
-	pVerbose := parser.Flag("v", "verbose", &argparse.Options{Required: false, Help: "Display every error"})
+	pVerbose := parser.Flag("v", "verbose", &argparse.Options{Required: false, Help: "Display every error and information messages"})
+
+	// TODO : working on aggressive mode - it will remove suscpicious process executable / track and remove suspicious PPID / remove schedule task & regkey persistence
+	//pAggressive := parser.Flag("a", "aggressive", &argparse.Options{Required: false, Help: "Aggressive mode - remove suscpicious process executable / track and remove suspicious PPID / remove schedule task & regkey persistence"})
+	pAggressive := false
 
 	err = parser.Parse(os.Args)
 	if err != nil {
@@ -68,12 +72,12 @@ func main() {
 	}
 	log.Println("[INIT]", len(rules.GetRules()), "YARA rules compiled")
 	log.Println("[INFO] Start scanning Memory / Registry / StartMenu / Task Scheduler / Filesystem")
-	go MemoryAnalysisRoutine(*pDump, *pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	//go RegistryAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	//go StartMenuAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	//go TaskSchedulerAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	//go WindowsFileSystemAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	//go UserFileSystemAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	go MemoryAnalysisRoutine(*pDump, *pQuarantine, *pKill, pAggressive, *pNotifications, *pVerbose, rules)
+	go RegistryAnalysisRoutine(*pQuarantine, *pKill, pAggressive, *pNotifications, *pVerbose, rules)
+	go StartMenuAnalysisRoutine(*pQuarantine, *pKill, pAggressive, *pNotifications, *pVerbose, rules)
+	go TaskSchedulerAnalysisRoutine(*pQuarantine, *pKill, pAggressive, *pNotifications, *pVerbose, rules)
+	go WindowsFileSystemAnalysisRoutine(*pQuarantine, *pKill, pAggressive, *pNotifications, *pVerbose, rules)
+	go UserFileSystemAnalysisRoutine(*pQuarantine, *pKill, pAggressive, *pNotifications, *pVerbose, rules)
 
 	for true {
 		time.Sleep(3600 * time.Second)
