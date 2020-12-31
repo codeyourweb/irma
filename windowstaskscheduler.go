@@ -27,9 +27,18 @@ type ExecAction struct {
 	Arguments        string
 }
 
+var (
+	unknown *ole.IUnknown
+	variant *ole.VARIANT
+	ts      *ole.IDispatch
+)
+
+var taskSchedulerInitialized bool = false
+
 // TaskSchedulerAnalysisRoutine analyse Windows Task Scheduler executable every 15 seconds
 func TaskSchedulerAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
 	for true {
+		defer UninitializeTaskScheduler()
 		tasks, err := GetTasks()
 		if err != nil && pVerbose {
 			log.Println("[ERROR]", err)
@@ -48,29 +57,52 @@ func TaskSchedulerAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bo
 	}
 }
 
+// InitTaskScheduler Initialize COM API & Task scheduler connect
+func InitTaskScheduler() error {
+	var err error
+	if err = ole.CoInitializeEx(0, 0); err != nil {
+		return errors.New("Could not initialize Windows COM API")
+	}
+
+	// Create an ITaskService object
+	unknown, err = ole.CreateInstance(ole.NewGUID("{0f87369f-a4e5-4cfc-bd3e-73e6154572dd}"), nil)
+	if err != nil {
+		return errors.New("Could not initialize Task Scheduler")
+	}
+
+	// Convert IUnknown to IDispatch to get more functions like CallMethod()
+	ts, err = unknown.QueryInterface(ole.IID_IDispatch)
+	if err != nil {
+		return errors.New("Could not prepare Task Scheduler")
+	}
+
+	// Connect to the Task Scheduler
+	if _, err = ts.CallMethod("Connect", "", "", "", ""); err != nil {
+		return errors.New("Could not connect to Task Scheduler")
+	}
+
+	return nil
+}
+
+// UninitializeTaskScheduler Release Task Scheduler COM API
+func UninitializeTaskScheduler() {
+	ole.CoUninitialize()
+	unknown.Release()
+	ts.Release()
+}
+
 // GetTasks returns a list of all scheduled Tasks in Windows Task Scheduler
 func GetTasks() ([]Task, error) {
-	// Initialize COM API
-	if err := ole.CoInitialize(0); err != nil {
-		return nil, errors.New("Could not initialize Windows COM API")
+	var err error
+
+	if !taskSchedulerInitialized {
+		err = InitTaskScheduler()
+		if err != nil {
+			return nil, err
+		}
+		taskSchedulerInitialized = true
 	}
-	defer ole.CoUninitialize()
-	// Create an ITaskService object
-	unknown, err := ole.CreateInstance(ole.NewGUID("{0f87369f-a4e5-4cfc-bd3e-73e6154572dd}"), nil)
-	if err != nil {
-		return nil, errors.New("Could not initialize Task Scheduler")
-	}
-	defer unknown.Release()
-	// Convert IUnknown to IDispatch to get more functions like CallMethod()
-	ts, err := unknown.QueryInterface(ole.IID_IDispatch)
-	if err != nil {
-		return nil, errors.New("Could not prepare Task Scheduler")
-	}
-	defer ts.Release()
-	// Connect to the Task Scheduler
-	if _, err := ts.CallMethod("Connect", "", "", "", ""); err != nil {
-		return nil, errors.New("Could not connect to Task Scheduler")
-	}
+
 	// Get Root Directory of Task Scheduler and get all tasks recursively
 	variant, err := oleutil.CallMethod(ts, "GetFolder", "\\")
 	if err != nil {

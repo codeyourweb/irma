@@ -4,9 +4,10 @@
 
 ## What is this project designed for?
 _IRMA_ is a lightweight tool made for live forensics on Windows Platform. It is 
-focused on two use cases:
+focused on three use cases:
 * enpoint detection - live analysis, quarantine and eradication of malware on a workstation 
 * live analysis & sandbox host - logging and instant notifications for malware TTP's assesment
+* signatures quality test - scan your endpoint baseline and check for false positives
 
 ## How IRMA scan for malware behaviour?
 _IRMA_ is intended to work with both user or administrator rights.
