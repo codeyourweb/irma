@@ -41,45 +41,18 @@ func MemoryAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pAggres
 
 		// analyze process memory and executable
 		for _, proc := range procs {
-			result := PerformYaraScan(proc.ProcessMemory, rules, pVerbose)
-			if len(result) == 0 {
-				procPE, err := ioutil.ReadFile(proc.ProcessPath)
-				if err != nil && pVerbose {
-					log.Println("[ERROR]", err)
-				}
-				result = PerformYaraScan(procPE, rules, pVerbose)
-			}
 
-			if len(result) > 0 {
-				// windows notifications
-				if pNotifications {
-					NotifyUser("YARA match", proc.ProcessName+" - PID:"+fmt.Sprint(proc.PID)+" match "+fmt.Sprint(len(result))+" rules")
-				}
-
-				// logging
-				for _, match := range result {
-					log.Println("[ALERT]", "YARA match", proc.ProcessName, "PID:", fmt.Sprint(proc.PID), match.Namespace, match.Rule)
-				}
-
-				// dump matching process to quarantine
-				if len(pQuarantine) > 0 {
-					log.Println("[INFO]", "DUMPING PID", proc.PID)
-					err := QuarantineProcess(proc, pQuarantine)
-					if err != nil {
-						log.Println("[ERROR]", "Cannot quarantine PID", proc.PID, err)
-					}
-				}
-
-				// killing process
-				if pKill {
-					if pVerbose {
-						log.Println("[INFO]", "KILLING PID", proc.PID)
-					}
-					KillProcessByID(proc.PID, pVerbose)
-				}
-
+			// parsing kill queue
+			if StringInSlice(proc.ProcessPath, killQueue) && pKill {
+				log.Println("[INFO]", "KILLING PID", proc.PID)
+				KillProcessByID(proc.PID, pVerbose)
+			} else {
+				MemoryAnalysis(proc, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules)
+				FileAnalysis(proc.ProcessPath, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules, "MEMORY")
 			}
 		}
+		killQueue = nil
+
 		time.Sleep(5 * time.Second)
 	}
 }
