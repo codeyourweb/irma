@@ -53,12 +53,12 @@ func MemoryAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pAggres
 			if len(result) > 0 {
 				// windows notifications
 				if pNotifications {
-					NotifyUser("YARA match", proc.ProcessName+":"+fmt.Sprint(proc.PID)+" match "+fmt.Sprint(len(result))+" rules")
+					NotifyUser("YARA match", proc.ProcessName+" - PID:"+fmt.Sprint(proc.PID)+" match "+fmt.Sprint(len(result))+" rules")
 				}
 
 				// logging
 				for _, match := range result {
-					log.Println("[ALERT]", "YARA MATCH", proc.ProcessName, "PID:", fmt.Sprint(proc.PID), match.Namespace, match.Rule)
+					log.Println("[ALERT]", "YARA match", proc.ProcessName, "PID:", fmt.Sprint(proc.PID), match.Namespace, match.Rule)
 				}
 
 				// dump matching process to quarantine

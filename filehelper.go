@@ -86,7 +86,7 @@ func FileAnalysis(path string, pQuarantine string, pKill bool, pAggressive bool,
 
 			// logging
 			for _, match := range result {
-				log.Println("[ALERT]", "YARA MATCH", path, match.Namespace, match.Rule)
+				log.Println("[ALERT]", "YARA match", path, match.Namespace, match.Rule)
 			}
 
 			// dump matching process to quarantine
