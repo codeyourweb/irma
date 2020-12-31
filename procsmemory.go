@@ -58,21 +58,23 @@ func MemoryAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pAggres
 
 				// logging
 				for _, match := range result {
-					log.Println("[INFO]", "YARA MATCH", proc.ProcessName, "PID:", fmt.Sprint(proc.PID), match.Namespace, match.Rule)
+					log.Println("[ALERT]", "YARA MATCH", proc.ProcessName, "PID:", fmt.Sprint(proc.PID), match.Namespace, match.Rule)
 				}
 
 				// dump matching process to quarantine
 				if len(pQuarantine) > 0 {
 					log.Println("[INFO]", "DUMPING PID", proc.PID)
 					err := QuarantineProcess(proc, pQuarantine)
-					if err != nil && pVerbose {
+					if err != nil {
 						log.Println("[ERROR]", "Cannot quarantine PID", proc.PID, err)
 					}
 				}
 
 				// killing process
 				if pKill {
-					log.Println("[INFO]", "KILLING PID", proc.PID)
+					if pVerbose {
+						log.Println("[INFO]", "KILLING PID", proc.PID)
+					}
 					KillProcessByID(proc.PID, pVerbose)
 				}
 

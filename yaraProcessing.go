@@ -5,7 +5,6 @@ import (
 	"log"
 	"os"
 	"path/filepath"
-	"strings"
 
 	"github.com/hillu/go-yara"
 )
@@ -21,24 +20,16 @@ func PerformYaraScan(data []byte, rules *yara.Rules, verbose bool) yara.MatchRul
 }
 
 // SearchForYaraFiles search *.yar file by walking recursively from specified input path
-func SearchForYaraFiles(path string) (rules []string) {
-	filepath.Walk(path, func(walk string, info os.FileInfo, err error) error {
-		if err != nil {
-			log.Println(err)
-		}
-
-		if err == nil && !info.IsDir() && info.Size() > 0 && len(filepath.Ext(walk)) > 0 && strings.ToLower(filepath.Ext(walk)) == ".yar" {
-			rules = append(rules, walk)
-		}
-
-		return nil
-	})
-
+func SearchForYaraFiles(path string, verbose bool) (rules []string) {
+	rules, err := RetrivesFilesFromUserPath(path, true, []string{".yar"}, true, verbose)
+	if err != nil && verbose {
+		log.Println(err)
+	}
 	return rules
 }
 
 // LoadYaraRules compile yara rules from specified paths and return a pointer to the yara compiler
-func LoadYaraRules(path []string) (compiler *yara.Compiler, err error) {
+func LoadYaraRules(path []string, verbose bool) (compiler *yara.Compiler, err error) {
 	compiler, err = yara.NewCompiler()
 	if err != nil {
 		return nil, errors.New("Failed to initialize YARA compiler")
@@ -46,12 +37,12 @@ func LoadYaraRules(path []string) (compiler *yara.Compiler, err error) {
 
 	for _, dir := range path {
 		f, err := os.Open(dir)
-		if err != nil {
+		if err != nil && verbose {
 			log.Println("[ERROR]", "Could not open rule file ", dir, err)
 		}
 
 		namespace := filepath.Base(dir)[:len(filepath.Base(dir))-4]
-		if err = compiler.AddFile(f, namespace); err != nil {
+		if err = compiler.AddFile(f, namespace); err != nil && verbose {
 			log.Println("[ERROR]", "Could not load rule file ", dir, err)
 		}
 		f.Close()

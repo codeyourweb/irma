@@ -20,15 +20,15 @@ import (
 // WindowsFileSystemAnalysisRoutine analyse windows filesystem every 300 seconds
 func WindowsFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
 	for true {
-		env := ListEnvironmentPathFiles()
-		temp := ListTemporaryFiles()
+		env := ListEnvironmentPathFiles(pVerbose)
+		temp := ListTemporaryFiles(pVerbose)
 
 		for _, p := range env {
-			FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules)
+			FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules, "ENV")
 		}
 
 		for _, p := range temp {
-			FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules)
+			FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules, "TEMP")
 		}
 
 		time.Sleep(300 * time.Second)
@@ -38,19 +38,19 @@ func WindowsFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pAggressiv
 // UserFileSystemAnalysisRoutine analyse windows filesystem every 60 seconds
 func UserFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
 	for true {
-		files := ListUserWorkspaceFiles()
+		files := ListUserWorkspaceFiles(pVerbose)
 
 		for _, p := range files {
-			FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules)
+			FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules, "USER")
 		}
 		time.Sleep(60 * time.Second)
 	}
 }
 
 // ListUserWorkspaceFiles recursively list all files in USERPROFILE directory
-func ListUserWorkspaceFiles() (files []string) {
-	f, err := RetrivesFilesFromUserPath(os.Getenv("USERPROFILE"), true, defaultScannedFileExtensions, true)
-	if err != nil {
+func ListUserWorkspaceFiles(verbose bool) (files []string) {
+	f, err := RetrivesFilesFromUserPath(os.Getenv("USERPROFILE"), true, defaultScannedFileExtensions, true, verbose)
+	if err != nil && verbose {
 		log.Println(err)
 	}
 
@@ -61,20 +61,20 @@ func ListUserWorkspaceFiles() (files []string) {
 }
 
 // FileAnalysis sub-routine for file analysis (used in registry / task scheduler / startmenu scan)
-func FileAnalysis(path string, pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+func FileAnalysis(path string, pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules, sourceIndex string) {
 	var err error
 	var content []byte
 	var result yara.MatchRules
 
 	content, err = ioutil.ReadFile(path)
-	if err != nil {
+	if err != nil && pVerbose {
 		log.Println(path, err)
 	}
 
 	fileHash := fmt.Sprintf("%x", md5.Sum(content))
 	if !StringInSlice(fileHash, filescanHistory) {
 		if pVerbose {
-			log.Println("[INFO] Analyzing", path)
+			log.Println("[INFO] ["+sourceIndex+"] Analyzing", path)
 		}
 
 		result, err = YaraScan(content, rules)
@@ -86,14 +86,14 @@ func FileAnalysis(path string, pQuarantine string, pKill bool, pAggressive bool,
 
 			// logging
 			for _, match := range result {
-				log.Println("[INFO]", "YARA MATCH", path, match.Namespace, match.Rule)
+				log.Println("[ALERT]", "YARA MATCH", path, match.Namespace, match.Rule)
 			}
 
 			// dump matching process to quarantine
 			if len(pQuarantine) > 0 {
 				log.Println("[INFO]", "DUMPING FILE", path)
 				err := QuarantineFile(content, filepath.Base(path), pQuarantine)
-				if err != nil && pVerbose {
+				if err != nil {
 					log.Println("[ERROR]", "Cannot quarantine file", path, err)
 				}
 			}
@@ -105,12 +105,12 @@ func FileAnalysis(path string, pQuarantine string, pKill bool, pAggressive bool,
 }
 
 // ListEnvironmentPathFiles list all files in PATH directories
-func ListEnvironmentPathFiles() (files []string) {
+func ListEnvironmentPathFiles(verbose bool) (files []string) {
 	env := os.Getenv("PATH")
 	paths := strings.Split(env, ";")
 	for _, p := range paths {
-		f, err := RetrivesFilesFromUserPath(p, true, defaultScannedFileExtensions, false)
-		if err != nil {
+		f, err := RetrivesFilesFromUserPath(p, true, defaultScannedFileExtensions, false, verbose)
+		if err != nil && verbose {
 			log.Println(err)
 			continue
 		}
@@ -124,7 +124,7 @@ func ListEnvironmentPathFiles() (files []string) {
 }
 
 // ListTemporaryFiles list all files in TEMP / TMP / %SystemRoot%\Temp
-func ListTemporaryFiles() (files []string) {
+func ListTemporaryFiles(verbose bool) (files []string) {
 
 	var folders = []string{os.Getenv("TEMP")}
 	if os.Getenv("TMP") != os.Getenv("TEMP") {
@@ -136,8 +136,8 @@ func ListTemporaryFiles() (files []string) {
 	}
 
 	for _, p := range folders {
-		f, err := RetrivesFilesFromUserPath(p, true, defaultScannedFileExtensions, true)
-		if err != nil {
+		f, err := RetrivesFilesFromUserPath(p, true, defaultScannedFileExtensions, true, verbose)
+		if err != nil && verbose {
 			log.Println(err)
 			continue
 		}
@@ -190,7 +190,7 @@ func FormatPathFromComplexString(command string) (paths []string) {
 }
 
 // RetrivesFilesFromUserPath return a []string of available files from given path (includeFileExtensions is available only if listFiles is true)
-func RetrivesFilesFromUserPath(path string, listFiles bool, includeFileExtensions []string, recursive bool) ([]string, error) {
+func RetrivesFilesFromUserPath(path string, listFiles bool, includeFileExtensions []string, recursive bool, verbose bool) ([]string, error) {
 	var p []string
 
 	info, err := os.Stat(path)
@@ -213,8 +213,8 @@ func RetrivesFilesFromUserPath(path string, listFiles bool, includeFileExtension
 			}
 		} else {
 			err := filepath.Walk(path, func(walk string, info os.FileInfo, err error) error {
-				if err != nil {
-					log.Println(err)
+				if err != nil && verbose {
+					log.Println("[ERROR]", err)
 				}
 
 				if err == nil && !(info.IsDir() == listFiles) && (len(includeFileExtensions) == 0 || StringInSlice(filepath.Ext(walk), includeFileExtensions)) {
@@ -224,8 +224,8 @@ func RetrivesFilesFromUserPath(path string, listFiles bool, includeFileExtension
 				return nil
 			})
 
-			if err != nil {
-				log.Println(err)
+			if err != nil && verbose {
+				log.Println("[ERROR]", err)
 			}
 		}
 	}

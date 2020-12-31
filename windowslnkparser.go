@@ -13,16 +13,18 @@ import (
 // StartMenuAnalysisRoutine analyse system artefacts every 15 seconds
 func StartMenuAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
 	for true {
-
-		lnk, errors := ListStartMenuLnkPersistence()
-		if errors != nil {
+		lnk, errors := ListStartMenuLnkPersistence(pVerbose)
+		if errors != nil && pVerbose {
 			for _, err := range errors {
 				log.Println("[ERROR]", err)
 			}
 		}
 
-		for _, p := range lnk {
-			FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules)
+		for _, l := range lnk {
+			paths := FormatPathFromComplexString(l)
+			for _, p := range paths {
+				FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules, "STARTMENU")
+			}
 		}
 
 		time.Sleep(15 * time.Second)
@@ -30,12 +32,12 @@ func StartMenuAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, 
 }
 
 // ListStartMenuFolders return a []string of all available StartMenu folders
-func ListStartMenuFolders() (startMenu []string, err error) {
+func ListStartMenuFolders(verbose bool) (startMenu []string, err error) {
 	var usersDir []string
 
 	startMenu = append(startMenu, os.Getenv("SystemDrive")+`\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp`)
 
-	usersDir, err = RetrivesFilesFromUserPath(os.Getenv("SystemDrive")+`\Users`, false, nil, false)
+	usersDir, err = RetrivesFilesFromUserPath(os.Getenv("SystemDrive")+`\Users`, false, nil, false, verbose)
 	if err != nil {
 		return startMenu, err
 	}
@@ -48,16 +50,16 @@ func ListStartMenuFolders() (startMenu []string, err error) {
 }
 
 // ListStartMenuLnkPersistence check for every *.lnk in Windows StartMenu folders and extract every executable path in those links
-func ListStartMenuLnkPersistence() (exePath []string, errors []error) {
+func ListStartMenuLnkPersistence(verbose bool) (exePath []string, errors []error) {
 
-	startMenuFolders, err := ListStartMenuFolders()
+	startMenuFolders, err := ListStartMenuFolders(verbose)
 	if err != nil {
-		log.Println(err)
+		errors = append(errors, err)
 	}
 
 	for _, path := range startMenuFolders {
 
-		files, err := RetrivesFilesFromUserPath(path, true, []string{".lnk"}, false)
+		files, err := RetrivesFilesFromUserPath(path, true, []string{".lnk"}, false, verbose)
 
 		if err != nil {
 			errors = append(errors, fmt.Errorf("%s - %s", path, err.Error()))

@@ -22,14 +22,17 @@ type RegistryValue struct {
 func RegistryAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
 	for true {
 		values, errors := EnumRegistryPeristence()
-		for _, err := range errors {
-			log.Println("[ERROR]", err)
+
+		if pVerbose {
+			for _, err := range errors {
+				log.Println("[ERROR]", err)
+			}
 		}
 
 		for _, k := range values {
 			paths := FormatPathFromComplexString(k.value)
 			for _, p := range paths {
-				FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules)
+				FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules, "REGISTRY")
 			}
 		}
 
