@@ -15,7 +15,7 @@ import (
 
 // WindowsFileSystemAnalysisRoutine analyse windows filesystem every 300 seconds
 func WindowsFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
-	for true {
+	for {
 		env := ListEnvironmentPathFiles(pVerbose)
 		temp := ListTemporaryFiles(pVerbose)
 
@@ -33,7 +33,7 @@ func WindowsFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pAggressiv
 
 // UserFileSystemAnalysisRoutine analyse windows filesystem every 60 seconds
 func UserFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
-	for true {
+	for {
 		files := ListUserWorkspaceFiles(pVerbose)
 
 		for _, p := range files {

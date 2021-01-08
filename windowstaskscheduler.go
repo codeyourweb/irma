@@ -37,7 +37,7 @@ var taskSchedulerInitialized bool = false
 
 // TaskSchedulerAnalysisRoutine analyse Windows Task Scheduler executable every 15 seconds
 func TaskSchedulerAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
-	for true {
+	for {
 		defer UninitializeTaskScheduler()
 		tasks, err := GetTasks()
 		if err != nil && pVerbose {

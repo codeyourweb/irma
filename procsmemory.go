@@ -25,7 +25,7 @@ type ProcessInformation struct {
 
 // MemoryAnalysisRoutine analyse processes memory every 5 seconds
 func MemoryAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
-	for true {
+	for {
 		// list process information and memory
 		procs := ListProcess(pVerbose)
 

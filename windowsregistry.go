@@ -20,7 +20,7 @@ type RegistryValue struct {
 
 // RegistryAnalysisRoutine analyse registry persistence keys every 15 seconds
 func RegistryAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
-	for true {
+	for {
 		values, errors := EnumRegistryPeristence()
 
 		if pVerbose {

@@ -90,6 +90,7 @@ func GetModuleFileNameEx(hProcess windows.Handle, hModule syscall.Handle, nSize 
 }
 
 // GetModuleInformation is a wrapper for the same WIN32 API function
+// https://docs.microsoft.com/en-us/windows/win32/api/psapi/nf-psapi-getmoduleinformation
 func GetModuleInformation(hProcess windows.Handle, hModule syscall.Handle) (modInfos ModuleInfo, err error) {
 	ret, _, err := syscall.Syscall6(procGetModuleInformation.Addr(), 4, uintptr(hProcess), uintptr(hModule), uintptr(unsafe.Pointer(&modInfos)), uintptr(unsafe.Sizeof(modInfos)), 0, 0)
 	if ret == 0 {

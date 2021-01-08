@@ -12,7 +12,7 @@ import (
 
 // StartMenuAnalysisRoutine analyse system artefacts every 15 seconds
 func StartMenuAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
-	for true {
+	for {
 		lnk, errors := ListStartMenuLnkPersistence(pVerbose)
 		if errors != nil && pVerbose {
 			for _, err := range errors {
