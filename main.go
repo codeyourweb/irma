@@ -17,8 +17,8 @@ import (
 
 var (
 	notificationsHistory []string
-	filescanHistory      []string
-	memoryscanHistory    []string
+	filescanHistory      []FileDescriptor
+	memoryHashHistory    []string
 	killQueue            []string
 	exit                 = make(chan bool)
 )

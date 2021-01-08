@@ -10,8 +10,8 @@ import (
 )
 
 // PerformYaraScan use provided YARA rules and search for match in the given byte slice
-func PerformYaraScan(data []byte, rules *yara.Rules, verbose bool) yara.MatchRules {
-	result, err := YaraScan(data, rules)
+func PerformYaraScan(data *[]byte, rules *yara.Rules, verbose bool) yara.MatchRules {
+	result, err := YaraScan(*data, rules)
 	if err != nil && verbose {
 		log.Println("[ERROR]", err)
 	}

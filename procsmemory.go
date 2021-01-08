@@ -17,10 +17,10 @@ import (
 
 // ProcessInformation wrap basic process information and memory dump in a structure
 type ProcessInformation struct {
-	PID           uint32
-	ProcessName   string
-	ProcessPath   string
-	ProcessMemory []byte
+	PID         uint32
+	ProcessName string
+	ProcessPath string
+	MemoryDump  []byte
 }
 
 // MemoryAnalysisRoutine analyse processes memory every 5 seconds
@@ -29,28 +29,34 @@ func MemoryAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pAggres
 		// list process information and memory
 		procs := ListProcess(pVerbose)
 
-		// dump process memory and quit the program
-		if len(pDump) > 0 {
-			for _, proc := range procs {
-				if err := WriteProcessMemoryToFile(pDump, proc.ProcessName+fmt.Sprint(proc.PID)+".dmp", proc.ProcessMemory); err != nil && pVerbose {
+		// analyze process memory and executable
+		for _, proc := range procs {
+			// dump processes memory and quit the program
+			if len(pDump) > 0 {
+				if err := WriteProcessMemoryToFile(pDump, proc.ProcessName+fmt.Sprint(proc.PID)+".dmp", proc.MemoryDump); err != nil && pVerbose {
 					log.Println("[ERROR]", err)
 				}
 			}
-			os.Exit(0)
-		}
-
-		// analyze process memory and executable
-		for _, proc := range procs {
 
 			// parsing kill queue
 			if StringInSlice(proc.ProcessPath, killQueue) && pKill {
 				log.Println("[INFO]", "KILLING PID", proc.PID)
 				KillProcessByID(proc.PID, pVerbose)
 			} else {
-				MemoryAnalysis(proc, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules)
+				// analyzing process memory and cleaning memory buffer
+				MemoryAnalysis(&proc, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules)
+				proc.MemoryDump = nil
+
+				// analyzing process executable
 				FileAnalysis(proc.ProcessPath, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules, "MEMORY")
 			}
 		}
+
+		if len(pDump) > 0 {
+			log.Println("[INFO] Processes memory dump completed - Exiting program.")
+			os.Exit(0)
+		}
+
 		killQueue = nil
 
 		time.Sleep(5 * time.Second)
@@ -73,36 +79,51 @@ func ListProcess(verbose bool) (procsInfo []ProcessInformation) {
 			}
 
 			if err == nil && procHandle > 0 {
-				procFilename, modules, err := GetProcessModulesHandles(procHandle)
-				if err == nil {
-					for _, moduleHandle := range modules {
-						if moduleHandle != 0 {
-							moduleRawName, err := GetModuleFileNameEx(procHandle, moduleHandle, 512)
-							if err != nil && verbose {
-								log.Println("[ERROR]", err)
-							}
-							moduleRawName = bytes.Trim(moduleRawName, "\x00")
-							modulePath := strings.Split(string(moduleRawName), "\\")
-							moduleFileName := modulePath[len(modulePath)-1]
-
-							if procFilename == moduleFileName {
-								memdump := DumpModuleMemory(procHandle, moduleHandle, verbose)
-								if len(memdump) > 0 {
-									proc := ProcessInformation{PID: procsIds[i], ProcessName: procFilename, ProcessPath: string(moduleRawName), ProcessMemory: memdump}
-									if !StringInSlice(fmt.Sprintf("%x", md5.Sum(memdump)), memoryscanHistory) {
-										procsInfo = append(procsInfo, proc)
-										memoryscanHistory = append(memoryscanHistory, fmt.Sprintf("%x", md5.Sum(memdump)))
-									}
-								}
-							}
+				if proc, memdump, err := GetProcessMemory(procsIds[i], procHandle, verbose); err != nil && verbose {
+					log.Println("[ERROR]", err)
+				} else {
+					if len(memdump) > 0 {
+						// return process memory only if it has changed since the last process scan
+						if !StringInSlice(fmt.Sprintf("%x", md5.Sum(memdump)), memoryHashHistory) {
+							proc.MemoryDump = memdump
+							procsInfo = append(procsInfo, proc)
+							memoryHashHistory = append(memoryHashHistory, fmt.Sprintf("%x", md5.Sum(memdump)))
 						}
 					}
 				}
+
 			}
 			windows.CloseHandle(procHandle)
 		}
 	}
 	return procsInfo
+}
+
+// GetProcessMemory return a process memory dump based on its handle
+func GetProcessMemory(pid uint32, handle windows.Handle, verbose bool) (ProcessInformation, []byte, error) {
+
+	procFilename, modules, err := GetProcessModulesHandles(handle)
+	if err != nil {
+		return ProcessInformation{}, nil, fmt.Errorf("Unable to get PID %d memory: %s", pid, err.Error())
+	}
+
+	for _, moduleHandle := range modules {
+		if moduleHandle != 0 {
+			moduleRawName, err := GetModuleFileNameEx(handle, moduleHandle, 512)
+			if err != nil {
+				return ProcessInformation{}, nil, err
+			}
+			moduleRawName = bytes.Trim(moduleRawName, "\x00")
+			modulePath := strings.Split(string(moduleRawName), "\\")
+			moduleFileName := modulePath[len(modulePath)-1]
+
+			if procFilename == moduleFileName {
+				return ProcessInformation{PID: pid, ProcessName: procFilename, ProcessPath: string(moduleRawName)}, DumpModuleMemory(handle, moduleHandle, verbose), nil
+			}
+		}
+	}
+
+	return ProcessInformation{}, nil, fmt.Errorf("Unable to get PID %d memory: no module corresponding to process name", pid)
 }
 
 // KillProcessByID try to kill the specified PID

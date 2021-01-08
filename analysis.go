@@ -1,7 +1,6 @@
 package main
 
 import (
-	"crypto/md5"
 	"crypto/rc4"
 	b64 "encoding/base64"
 	"fmt"
@@ -9,6 +8,7 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"runtime/debug"
 	"time"
 
 	"github.com/hillu/go-yara"
@@ -28,8 +28,10 @@ func FileAnalysis(path string, pQuarantine string, pKill bool, pAggressive bool,
 	var content []byte
 	var result yara.MatchRules
 
-	if f, err = os.Stat(path); err != nil && pVerbose {
-		log.Println("[ERROR]", path, err)
+	if f, err = os.Stat(path); err != nil {
+		if pVerbose {
+			log.Println("[ERROR]", path, err)
+		}
 	} else {
 		if RegisterFileInHistory(f, path, &filescanHistory) {
 			content, err = ioutil.ReadFile(path)
@@ -41,7 +43,12 @@ func FileAnalysis(path string, pQuarantine string, pKill bool, pAggressive bool,
 				log.Println("[INFO] ["+sourceIndex+"] Analyzing", path)
 			}
 
-			result = PerformYaraScan(content, rules, pVerbose)
+			// cleaning memory if file size is greater than 1Gb
+			if len(content) > 1024*1024*1024 {
+				defer debug.FreeOSMemory()
+			}
+
+			result = PerformYaraScan(&content, rules, pVerbose)
 
 			if len(result) > 0 {
 				// windows notifications
@@ -73,51 +80,45 @@ func FileAnalysis(path string, pQuarantine string, pKill bool, pAggressive bool,
 }
 
 // MemoryAnalysis sub-routine for running processes analysis
-func MemoryAnalysis(proc ProcessInformation, pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
-	memoryHash := fmt.Sprintf("%x", md5.Sum(proc.ProcessMemory))
+func MemoryAnalysis(proc *ProcessInformation, pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+	if pVerbose {
+		log.Println("[INFO] [MEMORY] Analyzing", proc.ProcessName, "PID:", proc.PID)
+	}
 
-	// if hash isn't already whitelisted, yara scan it
-	if !StringInSlice(memoryHash, memoryscanHistory) {
-		if pVerbose {
-			log.Println("[INFO] [MEMORY] Analyzing", proc.ProcessName, "PID:", proc.PID)
+	result := PerformYaraScan(&proc.MemoryDump, rules, pVerbose)
+	if len(result) > 0 {
+		// windows notifications
+		if pNotifications {
+			NotifyUser("YARA match", proc.ProcessName+" - PID:"+fmt.Sprint(proc.PID)+" match "+fmt.Sprint(len(result))+" rules")
 		}
 
-		result := PerformYaraScan(proc.ProcessMemory, rules, pVerbose)
-		if len(result) > 0 {
-			// windows notifications
-			if pNotifications {
-				NotifyUser("YARA match", proc.ProcessName+" - PID:"+fmt.Sprint(proc.PID)+" match "+fmt.Sprint(len(result))+" rules")
-			}
+		// logging
+		for _, match := range result {
+			log.Println("[ALERT]", "[MEMORY] YARA match", proc.ProcessName, "PID:", fmt.Sprint(proc.PID), match.Namespace, match.Rule)
+		}
 
-			// logging
-			for _, match := range result {
-				log.Println("[ALERT]", "[MEMORY] YARA match", proc.ProcessName, "PID:", fmt.Sprint(proc.PID), match.Namespace, match.Rule)
+		// dump matching process to quarantine
+		if len(pQuarantine) > 0 {
+			log.Println("[INFO]", "DUMPING PID", proc.PID)
+			err := QuarantineProcess(proc, pQuarantine)
+			if err != nil {
+				log.Println("[ERROR]", "Cannot quarantine PID", proc.PID, err)
 			}
+		}
 
-			// dump matching process to quarantine
-			if len(pQuarantine) > 0 {
-				log.Println("[INFO]", "DUMPING PID", proc.PID)
-				err := QuarantineProcess(proc, pQuarantine)
-				if err != nil {
-					log.Println("[ERROR]", "Cannot quarantine PID", proc.PID, err)
-				}
-			}
-
-			// killing process
-			if pKill {
-				log.Println("[INFO]", "KILLING PID", proc.PID)
-				KillProcessByID(proc.PID, pVerbose)
-			}
-		} else {
-			memoryscanHistory = append(memoryscanHistory, memoryHash)
+		// killing process
+		if pKill {
+			log.Println("[INFO]", "KILLING PID", proc.PID)
+			KillProcessByID(proc.PID, pVerbose)
 		}
 	}
+
 }
 
 // QuarantineProcess dump process memory and cipher them in quarantine folder
-func QuarantineProcess(proc ProcessInformation, quarantinePath string) (err error) {
+func QuarantineProcess(proc *ProcessInformation, quarantinePath string) (err error) {
 
-	err = quarantineContent(proc.ProcessMemory, proc.ProcessName+fmt.Sprint(proc.PID)+".mem", quarantinePath)
+	err = quarantineContent(proc.MemoryDump, proc.ProcessName+fmt.Sprint(proc.PID)+".mem", quarantinePath)
 	if err != nil {
 		return err
 	}
