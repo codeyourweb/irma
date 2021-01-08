@@ -9,55 +9,65 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"time"
 
 	"github.com/hillu/go-yara"
 )
 
+// FileDescriptor wrap path, filehash and last update into a structure. It is used for performance improvements and avoid reading file if it has not changed
+type FileDescriptor struct {
+	FilePath     string
+	FileSize     int64
+	LastModified time.Time
+}
+
 // FileAnalysis sub-routine for file analysis (used in registry / task scheduler / startmenu scan)
 func FileAnalysis(path string, pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules, sourceIndex string) {
+	var f os.FileInfo
 	var err error
 	var content []byte
 	var result yara.MatchRules
 
-	content, err = ioutil.ReadFile(path)
-	if err != nil && pVerbose {
-		log.Println(path, err)
-	}
-
-	fileHash := fmt.Sprintf("%x", md5.Sum(content))
-	if !StringInSlice(fileHash, filescanHistory) {
-		if pVerbose {
-			log.Println("[INFO] ["+sourceIndex+"] Analyzing", path)
-		}
-
-		result = PerformYaraScan(content, rules, pVerbose)
-
-		if len(result) > 0 {
-			// windows notifications
-			if pNotifications {
-				NotifyUser("YARA match", path+" match "+fmt.Sprint(len(result))+" rules")
+	if f, err = os.Stat(path); err != nil && pVerbose {
+		log.Println("[ERROR]", path, err)
+	} else {
+		if RegisterFileInHistory(f, path, &filescanHistory) {
+			content, err = ioutil.ReadFile(path)
+			if err != nil && pVerbose {
+				log.Println("[ERROR]", path, err)
 			}
 
-			// logging
-			for _, match := range result {
-				log.Println("[ALERT]", "["+sourceIndex+"] YARA match", path, match.Namespace, match.Rule)
+			if pVerbose {
+				log.Println("[INFO] ["+sourceIndex+"] Analyzing", path)
 			}
 
-			// kill
-			if pKill {
-				killQueue = append(killQueue, path)
-			}
+			result = PerformYaraScan(content, rules, pVerbose)
 
-			// dump matching file to quarantine
-			if len(pQuarantine) > 0 {
-				log.Println("[INFO]", "Dumping file", path)
-				err := QuarantineFile(path, pQuarantine)
-				if err != nil {
-					log.Println("[ERROR]", "Cannot quarantine file", path, err)
+			if len(result) > 0 {
+				// windows notifications
+				if pNotifications {
+					NotifyUser("YARA match", path+" match "+fmt.Sprint(len(result))+" rules")
+				}
+
+				// logging
+				for _, match := range result {
+					log.Println("[ALERT]", "["+sourceIndex+"] YARA match", path, match.Namespace, match.Rule)
+				}
+
+				// kill
+				if pKill {
+					killQueue = append(killQueue, path)
+				}
+
+				// dump matching file to quarantine
+				if len(pQuarantine) > 0 {
+					log.Println("[INFO]", "Dumping file", path)
+					err := QuarantineFile(path, pQuarantine)
+					if err != nil {
+						log.Println("[ERROR]", "Cannot quarantine file", path, err)
+					}
 				}
 			}
-		} else {
-			filescanHistory = append(filescanHistory, fileHash)
 		}
 	}
 }

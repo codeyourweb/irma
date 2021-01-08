@@ -2,9 +2,28 @@ package main
 
 import (
 	"log"
+	"os"
 
 	"github.com/gen2brain/beeep"
 )
+
+// RegisterFileInHistory check if file is already known and hasn't change in files history return true if file is append to history and false if it is already known as is.
+func RegisterFileInHistory(f os.FileInfo, path string, history *[]FileDescriptor) bool {
+	for i, h := range *history {
+		if h.FilePath == path {
+			if h.LastModified == f.ModTime() && h.FileSize == f.Size() {
+				return false
+			}
+			(*history)[i].LastModified = f.ModTime()
+			(*history)[i].FileSize = f.Size()
+			return true
+		}
+	}
+
+	var d = FileDescriptor{FilePath: path, FileSize: f.Size(), LastModified: f.ModTime()}
+	*history = append(*history, d)
+	return true
+}
 
 // StringInSlice check wether or not a string already is inside a specified slice
 func StringInSlice(a string, list []string) bool {
