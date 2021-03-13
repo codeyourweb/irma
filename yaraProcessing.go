@@ -1,17 +1,55 @@
 package main
 
 import (
+	"bytes"
 	"errors"
 	"log"
 	"os"
 	"path/filepath"
 
-	"github.com/hillu/go-yara"
+	"github.com/gen2brain/go-unarr"
+	"github.com/hillu/go-yara/v4"
 )
 
 // PerformYaraScan use provided YARA rules and search for match in the given byte slice
 func PerformYaraScan(data *[]byte, rules *yara.Rules, verbose bool) yara.MatchRules {
 	result, err := YaraScan(*data, rules)
+	if err != nil && verbose {
+		log.Println("[ERROR]", err)
+	}
+
+	return result
+}
+
+// PerformArchiveYaraScan try to decompress archive and YARA scan every file in it
+func PerformArchiveYaraScan(path string, rules *yara.Rules, verbose bool) yara.MatchRules {
+	var buffer [][]byte
+
+	a, err := unarr.NewArchive(path)
+	if err != nil && verbose {
+		log.Println("[ERROR]", err)
+	}
+	defer a.Close()
+
+	list, err := a.List()
+	if err != nil && verbose {
+		log.Println("[ERROR]", err)
+	}
+	for _, f := range list {
+		err := a.EntryFor(f)
+		if err != nil && verbose {
+			log.Println("[ERROR]", err)
+		}
+
+		data, err := a.ReadAll()
+		if err != nil && verbose {
+			log.Println("[ERROR]", err)
+		}
+
+		buffer = append(buffer, data)
+	}
+
+	result, err := YaraScan(bytes.Join(buffer, []byte{}), rules)
 	if err != nil && verbose {
 		log.Println("[ERROR]", err)
 	}

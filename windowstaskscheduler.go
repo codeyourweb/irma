@@ -7,7 +7,7 @@ import (
 
 	ole "github.com/go-ole/go-ole"
 	oleutil "github.com/go-ole/go-ole/oleutil"
-	"github.com/hillu/go-yara"
+	"github.com/hillu/go-yara/v4"
 )
 
 // Task is a task found in Windows Task Scheduler

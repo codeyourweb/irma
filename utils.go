@@ -8,7 +8,14 @@ import (
 )
 
 // RegisterFileInHistory check if file is already known and hasn't change in files history return true if file is append to history and false if it is already known as is.
-func RegisterFileInHistory(f os.FileInfo, path string, history *[]FileDescriptor) bool {
+func RegisterFileInHistory(f os.FileInfo, path string, history *[]FileDescriptor, verbose bool) bool {
+	if int(f.Size()) > 1024*1024*maxFilesizeScan {
+		if verbose {
+			log.Println("[INFO]", path, "skipped - larger than", maxFilesizeScan, "Mb")
+		}
+		return true
+	}
+
 	for i, h := range *history {
 		if h.FilePath == path {
 			if h.LastModified == f.ModTime() && h.FileSize == f.Size() {

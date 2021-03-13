@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
@@ -10,7 +9,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hillu/go-yara"
+	"github.com/hillu/go-yara/v4"
 )
 
 // WindowsFileSystemAnalysisRoutine analyse windows filesystem every 300 seconds
@@ -154,7 +153,7 @@ func RetrivesFilesFromUserPath(path string, listFiles bool, includeFileExtension
 		p = append(p, path)
 	} else {
 		if !recursive {
-			files, err := ioutil.ReadDir(path)
+			files, err := os.ReadDir(path)
 			if err != nil {
 				return []string{}, err
 			}

@@ -6,7 +6,7 @@ import (
 	"os"
 	"time"
 
-	"github.com/hillu/go-yara"
+	"github.com/hillu/go-yara/v4"
 	golnk "github.com/parsiya/golnk"
 )
 

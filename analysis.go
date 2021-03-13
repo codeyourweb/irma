@@ -4,14 +4,14 @@ import (
 	"crypto/rc4"
 	b64 "encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"path/filepath"
 	"runtime/debug"
 	"time"
 
-	"github.com/hillu/go-yara"
+	"github.com/h2non/filetype"
+	"github.com/hillu/go-yara/v4"
 )
 
 // FileDescriptor wrap path, filehash and last update into a structure. It is used for performance improvements and avoid reading file if it has not changed
@@ -33,8 +33,14 @@ func FileAnalysis(path string, pQuarantine string, pKill bool, pAggressive bool,
 			log.Println("[ERROR]", path, err)
 		}
 	} else {
-		if RegisterFileInHistory(f, path, &filescanHistory) {
-			content, err = ioutil.ReadFile(path)
+		if RegisterFileInHistory(f, path, &filescanHistory, pVerbose) {
+
+			content, err = os.ReadFile(path)
+			if err != nil && pVerbose {
+				log.Println("[ERROR]", path, err)
+			}
+
+			filetype, err := filetype.Match(content)
 			if err != nil && pVerbose {
 				log.Println("[ERROR]", path, err)
 			}
@@ -43,12 +49,17 @@ func FileAnalysis(path string, pQuarantine string, pKill bool, pAggressive bool,
 				log.Println("[INFO] ["+sourceIndex+"] Analyzing", path)
 			}
 
-			// cleaning memory if file size is greater than 1Gb
-			if len(content) > 1024*1024*1024 {
+			// cleaning memory if file size is greater than 512Mb
+			if len(content) > 1024*1024*cleanIfFileSizeGreaterThan {
 				defer debug.FreeOSMemory()
 			}
 
-			result = PerformYaraScan(&content, rules, pVerbose)
+			// archive or other file format scan
+			if StringInSlice(filetype.MIME.Value, archivesFormats) {
+				result = PerformArchiveYaraScan(path, rules, pVerbose)
+			} else {
+				result = PerformYaraScan(&content, rules, pVerbose)
+			}
 
 			if len(result) > 0 {
 				// windows notifications
@@ -133,7 +144,7 @@ func QuarantineProcess(proc *ProcessInformation, quarantinePath string) (err err
 
 // QuarantineFile dump specified file and cipher them in quarantine folder
 func QuarantineFile(path, quarantinePath string) (err error) {
-	fileContent, err := ioutil.ReadFile(path)
+	fileContent, err := os.ReadFile(path)
 	if err != nil {
 		return err
 	}
@@ -162,7 +173,7 @@ func quarantineContent(content []byte, filename string, quarantinePath string) (
 
 	xPE := make([]byte, len(content))
 	c.XORKeyStream(xPE, content)
-	err = ioutil.WriteFile(quarantinePath+"/"+filename+".irma", []byte(b64.StdEncoding.EncodeToString(xPE)), 0644)
+	err = os.WriteFile(quarantinePath+"/"+filename+".irma", []byte(b64.StdEncoding.EncodeToString(xPE)), 0644)
 	if err != nil {
 		return err
 	}

@@ -6,7 +6,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/hillu/go-yara"
+	"github.com/hillu/go-yara/v4"
 	"golang.org/x/sys/windows/registry"
 )
 

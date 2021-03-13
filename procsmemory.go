@@ -4,14 +4,13 @@ import (
 	"bytes"
 	"crypto/md5"
 	"fmt"
-	"io/ioutil"
 	"log"
 	"os"
 	"strings"
 	"syscall"
 	"time"
 
-	"github.com/hillu/go-yara"
+	"github.com/hillu/go-yara/v4"
 	"golang.org/x/sys/windows"
 )
 
@@ -199,7 +198,7 @@ func WriteProcessMemoryToFile(path string, file string, data []byte) (err error)
 		}
 	}
 
-	if err := ioutil.WriteFile(path+"/"+file, data, 0644); err != nil {
+	if err := os.WriteFile(path+"/"+file, data, 0644); err != nil {
 		return err
 	}
 
