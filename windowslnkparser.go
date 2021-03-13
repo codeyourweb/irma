@@ -11,7 +11,7 @@ import (
 )
 
 // StartMenuAnalysisRoutine analyse system artefacts every 15 seconds
-func StartMenuAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+func StartMenuAnalysisRoutine(pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
 	for {
 		lnk, errors := ListStartMenuLnkPersistence(pVerbose)
 		if errors != nil && pVerbose {
@@ -23,7 +23,7 @@ func StartMenuAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, 
 		for _, l := range lnk {
 			paths := FormatPathFromComplexString(l)
 			for _, p := range paths {
-				FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules, "STARTMENU")
+				FileAnalysis(p, pQuarantine, pKill, pNotifications, pVerbose, rules, "STARTMENU")
 			}
 		}
 

@@ -23,7 +23,7 @@ type ProcessInformation struct {
 }
 
 // MemoryAnalysisRoutine analyse processes memory every 5 seconds
-func MemoryAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+func MemoryAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
 	for {
 		// list process information and memory
 		procs := ListProcess(pVerbose)
@@ -43,11 +43,11 @@ func MemoryAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pAggres
 				KillProcessByID(proc.PID, pVerbose)
 			} else {
 				// analyzing process memory and cleaning memory buffer
-				MemoryAnalysis(&proc, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules)
+				MemoryAnalysis(&proc, pQuarantine, pKill, pNotifications, pVerbose, rules)
 				proc.MemoryDump = nil
 
 				// analyzing process executable
-				FileAnalysis(proc.ProcessPath, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules, "MEMORY")
+				FileAnalysis(proc.ProcessPath, pQuarantine, pKill, pNotifications, pVerbose, rules, "MEMORY")
 			}
 		}
 

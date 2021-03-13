@@ -19,7 +19,7 @@ type RegistryValue struct {
 }
 
 // RegistryAnalysisRoutine analyse registry persistence keys every 15 seconds
-func RegistryAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+func RegistryAnalysisRoutine(pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
 	for {
 		values, errors := EnumRegistryPeristence()
 
@@ -32,7 +32,7 @@ func RegistryAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, p
 		for _, k := range values {
 			paths := FormatPathFromComplexString(k.value)
 			for _, p := range paths {
-				FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules, "REGISTRY")
+				FileAnalysis(p, pQuarantine, pKill, pNotifications, pVerbose, rules, "REGISTRY")
 			}
 		}
 

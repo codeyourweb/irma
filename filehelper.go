@@ -13,17 +13,17 @@ import (
 )
 
 // WindowsFileSystemAnalysisRoutine analyse windows filesystem every 300 seconds
-func WindowsFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+func WindowsFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
 	for {
 		env := ListEnvironmentPathFiles(pVerbose)
 		temp := ListTemporaryFiles(pVerbose)
 
 		for _, p := range env {
-			FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules, "ENV")
+			FileAnalysis(p, pQuarantine, pKill, pNotifications, pVerbose, rules, "ENV")
 		}
 
 		for _, p := range temp {
-			FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules, "TEMP")
+			FileAnalysis(p, pQuarantine, pKill, pNotifications, pVerbose, rules, "TEMP")
 		}
 
 		time.Sleep(300 * time.Second)
@@ -31,12 +31,12 @@ func WindowsFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pAggressiv
 }
 
 // UserFileSystemAnalysisRoutine analyse windows filesystem every 60 seconds
-func UserFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+func UserFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
 	for {
 		files := ListUserWorkspaceFiles(pVerbose)
 
 		for _, p := range files {
-			FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules, "USER")
+			FileAnalysis(p, pQuarantine, pKill, pNotifications, pVerbose, rules, "USER")
 		}
 		time.Sleep(60 * time.Second)
 	}

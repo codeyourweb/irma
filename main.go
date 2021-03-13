@@ -53,12 +53,11 @@ func main() {
 	pBpfFilter := parser.String("b", "bpffilter", &argparse.Options{Required: false, Default: "", Help: "Use Berkeley Packet Filter to capture only selected parts of network traffic"})
 	pYaraPath := parser.String("y", "yara-rules", &argparse.Options{Required: false, Default: "./yara-signatures", Help: "Yara rules path (the program will look for *.yar files recursively)"})
 	pDump := parser.String("d", "dump", &argparse.Options{Required: false, Help: "Dump all running process to the specified directory"})
-	pQuarantine := parser.String("q", "quarantine", &argparse.Options{Required: false, Help: "Specify path to store matching artefacts in quarantine (Base64/RC4 with key: irma"})
+	pQuarantine := parser.String("q", "quarantine", &argparse.Options{Required: false, Help: "Specify path to store matching artefacts in quarantine (Base64/RC4 with key: irma)"})
 	pKill := parser.Flag("k", "kill", &argparse.Options{Required: false, Help: "Kill suspicious process ID (without removing process binary)"})
 	pFaker := parser.Flag("f", "faker", &argparse.Options{Required: false, Help: "Spawn fake processes such as wireshark / procmon / procdump / x64dbg"})
 	pNotifications := parser.Flag("n", "notifications", &argparse.Options{Required: false, Help: "Use Windows notifications when a file or memory stream match your YARA rules"})
 	pVerbose := parser.Flag("v", "verbose", &argparse.Options{Required: false, Help: "Display every error and information messages"})
-	pAggressive := parser.Flag("a", "aggressive", &argparse.Options{Required: false, Help: "Aggressive mode - remove suscpicious process executable / track and kill suspicious PPID / remove schedule task & regkey persistence"})
 
 	err = parser.Parse(os.Args)
 	if err != nil {
@@ -102,12 +101,12 @@ func main() {
 	if len(*pNetworkCapturePath) > 0 {
 		go NetworkAnalysisRoutine(*pBpfFilter, *pNetworkCapturePath, *pVerbose)
 	}
-	go MemoryAnalysisRoutine(*pDump, *pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	go RegistryAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	go StartMenuAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	go TaskSchedulerAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	go WindowsFileSystemAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
-	go UserFileSystemAnalysisRoutine(*pQuarantine, *pKill, *pAggressive, *pNotifications, *pVerbose, rules)
+	go MemoryAnalysisRoutine(*pDump, *pQuarantine, *pKill, *pNotifications, *pVerbose, rules)
+	go RegistryAnalysisRoutine(*pQuarantine, *pKill, *pNotifications, *pVerbose, rules)
+	go StartMenuAnalysisRoutine(*pQuarantine, *pKill, *pNotifications, *pVerbose, rules)
+	go TaskSchedulerAnalysisRoutine(*pQuarantine, *pKill, *pNotifications, *pVerbose, rules)
+	go WindowsFileSystemAnalysisRoutine(*pQuarantine, *pKill, *pNotifications, *pVerbose, rules)
+	go UserFileSystemAnalysisRoutine(*pQuarantine, *pKill, *pNotifications, *pVerbose, rules)
 	<-exit
 
 }

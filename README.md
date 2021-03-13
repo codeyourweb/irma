@@ -31,27 +31,32 @@ _go-yara_ and CGO compilation. You'll find a detailed documentation [here](READM
 
 ### Usage 
 ```
-usage: irma [-h|--help] [-y|--yara-rules "<value>"] [-d|--dump "<value>"]
+usage: irma [-h|--help] [-c|--network-capture "<value>"] [-b|--bpffilter
+            "<value>"] [-y|--yara-rules "<value>"] [-d|--dump "<value>"]
             [-q|--quarantine "<value>"] [-k|--kill] [-f|--faker]
-            [-n|--notifications] [-v|--verbose]
+            [-n|--notifications] [-v|--verbose] 
 
             Incident Response - Minimal Analysis
 
 Arguments:
 
-  -h  --help           Print help information
-  -y  --yara-rules     Yara rules path (the program will look for *.yar files
-                       recursively). Default: ./yara-signatures
-  -d  --dump           Dump all running process to the specified directory
-  -q  --quarantine     Specify path to store matching artefacts in quarantine
-                       (Base64/RC4 with key: irma
-  -k  --kill           Kill suspicious process ID (without removing process
-                       binary)
-  -f  --faker          Spawn fake processes such as wireshark / procmon /
-                       procdump / x64dbg
-  -n  --notifications  Use Windows notifications when a file or memory stream
-                       match your YARA rules
-  -v  --verbose        Display every error and information messages
+  -h  --help             Print help information
+  -c  --network-capture  Capture network interface to PCAP file. Default:
+  -b  --bpffilter        Use Berkeley Packet Filter to capture only selected
+                         parts of network traffic. Default:
+  -y  --yara-rules       Yara rules path (the program will look for *.yar files
+                         recursively). Default: ./yara-signatures
+  -d  --dump             Dump all running process to the specified directory
+  -q  --quarantine       Specify path to store matching artefacts in quarantine
+                         (Base64/RC4 with key: irma)
+  -k  --kill             Kill suspicious process ID (without removing process
+                         binary)
+  -f  --faker            Spawn fake processes such as wireshark / procmon /
+                         procdump / x64dbg
+  -n  --notifications    Use Windows notifications when a file or memory stream
+                         match your YARA rules
+  -v  --verbose          Display every error and information messages
+
 ``` 
 
 ## About this project and future versions

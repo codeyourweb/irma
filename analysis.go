@@ -22,7 +22,7 @@ type FileDescriptor struct {
 }
 
 // FileAnalysis sub-routine for file analysis (used in registry / task scheduler / startmenu scan)
-func FileAnalysis(path string, pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules, sourceIndex string) {
+func FileAnalysis(path string, pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, rules *yara.Rules, sourceIndex string) {
 	var f os.FileInfo
 	var err error
 	var content []byte
@@ -91,7 +91,7 @@ func FileAnalysis(path string, pQuarantine string, pKill bool, pAggressive bool,
 }
 
 // MemoryAnalysis sub-routine for running processes analysis
-func MemoryAnalysis(proc *ProcessInformation, pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+func MemoryAnalysis(proc *ProcessInformation, pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
 	if pVerbose {
 		log.Println("[INFO] [MEMORY] Analyzing", proc.ProcessName, "PID:", proc.PID)
 	}

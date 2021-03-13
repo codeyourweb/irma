@@ -36,7 +36,7 @@ var (
 var taskSchedulerInitialized bool = false
 
 // TaskSchedulerAnalysisRoutine analyse Windows Task Scheduler executable every 15 seconds
-func TaskSchedulerAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+func TaskSchedulerAnalysisRoutine(pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
 	for {
 		defer UninitializeTaskScheduler()
 		tasks, err := GetTasks()
@@ -48,7 +48,7 @@ func TaskSchedulerAnalysisRoutine(pQuarantine string, pKill bool, pAggressive bo
 			for _, e := range t.ActionList {
 				paths := FormatPathFromComplexString(e.Path)
 				for _, p := range paths {
-					FileAnalysis(p, pQuarantine, pKill, pAggressive, pNotifications, pVerbose, rules, "TASKS")
+					FileAnalysis(p, pQuarantine, pKill, pNotifications, pVerbose, rules, "TASKS")
 				}
 			}
 		}
