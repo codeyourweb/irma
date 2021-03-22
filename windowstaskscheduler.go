@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"log"
 	"time"
 
 	ole "github.com/go-ole/go-ole"
@@ -36,12 +35,12 @@ var (
 var taskSchedulerInitialized bool = false
 
 // TaskSchedulerAnalysisRoutine analyse Windows Task Scheduler executable every 15 seconds
-func TaskSchedulerAnalysisRoutine(pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+func TaskSchedulerAnalysisRoutine(pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, pInfiniteLoop bool, rules *yara.Rules) {
 	for {
 		defer UninitializeTaskScheduler()
 		tasks, err := GetTasks()
 		if err != nil && pVerbose {
-			log.Println("[ERROR]", err)
+			logMessage(LOG_ERROR, "[ERROR]", err)
 		}
 
 		for _, t := range tasks {
@@ -53,7 +52,11 @@ func TaskSchedulerAnalysisRoutine(pQuarantine string, pKill bool, pNotifications
 			}
 		}
 
-		time.Sleep(15 * time.Second)
+		if !pInfiniteLoop {
+			break
+		} else {
+			time.Sleep(15 * time.Second)
+		}
 	}
 }
 

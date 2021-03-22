@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"strings"
 	"time"
 
@@ -19,13 +18,13 @@ type RegistryValue struct {
 }
 
 // RegistryAnalysisRoutine analyse registry persistence keys every 15 seconds
-func RegistryAnalysisRoutine(pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+func RegistryAnalysisRoutine(pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, pInfiniteLoop bool, rules *yara.Rules) {
 	for {
 		values, errors := EnumRegistryPeristence()
 
 		if pVerbose {
 			for _, err := range errors {
-				log.Println("[ERROR]", err)
+				logMessage(LOG_ERROR, "[ERROR]", err)
 			}
 		}
 
@@ -36,7 +35,11 @@ func RegistryAnalysisRoutine(pQuarantine string, pKill bool, pNotifications bool
 			}
 		}
 
-		time.Sleep(15 * time.Second)
+		if !pInfiniteLoop {
+			break
+		} else {
+			time.Sleep(15 * time.Second)
+		}
 	}
 }
 

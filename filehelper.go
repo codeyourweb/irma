@@ -2,7 +2,6 @@ package main
 
 import (
 	"errors"
-	"log"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -13,7 +12,7 @@ import (
 )
 
 // WindowsFileSystemAnalysisRoutine analyse windows filesystem every 300 seconds
-func WindowsFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+func WindowsFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, pInfiniteLoop bool, rules *yara.Rules) {
 	for {
 		env := ListEnvironmentPathFiles(pVerbose)
 		temp := ListTemporaryFiles(pVerbose)
@@ -26,19 +25,28 @@ func WindowsFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pNotificat
 			FileAnalysis(p, pQuarantine, pKill, pNotifications, pVerbose, rules, "TEMP")
 		}
 
-		time.Sleep(300 * time.Second)
+		if !pInfiniteLoop {
+			break
+		} else {
+			time.Sleep(300 * time.Second)
+		}
 	}
 }
 
 // UserFileSystemAnalysisRoutine analyse windows filesystem every 60 seconds
-func UserFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+func UserFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, pInfiniteLoop bool, rules *yara.Rules) {
 	for {
 		files := ListUserWorkspaceFiles(pVerbose)
 
 		for _, p := range files {
 			FileAnalysis(p, pQuarantine, pKill, pNotifications, pVerbose, rules, "USER")
 		}
-		time.Sleep(60 * time.Second)
+
+		if !pInfiniteLoop {
+			break
+		} else {
+			time.Sleep(60 * time.Second)
+		}
 	}
 }
 
@@ -46,7 +54,7 @@ func UserFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pNotification
 func ListUserWorkspaceFiles(verbose bool) (files []string) {
 	f, err := RetrivesFilesFromUserPath(os.Getenv("USERPROFILE"), true, defaultScannedFileExtensions, true, verbose)
 	if err != nil && verbose {
-		log.Println(err)
+		logMessage(LOG_INFO, err)
 	}
 
 	for _, i := range f {
@@ -61,8 +69,10 @@ func ListEnvironmentPathFiles(verbose bool) (files []string) {
 	paths := strings.Split(env, ";")
 	for _, p := range paths {
 		f, err := RetrivesFilesFromUserPath(p, true, defaultScannedFileExtensions, false, verbose)
-		if err != nil && verbose {
-			log.Println(err)
+		if err != nil {
+			if verbose {
+				logMessage(LOG_ERROR, err)
+			}
 			continue
 		}
 
@@ -88,8 +98,10 @@ func ListTemporaryFiles(verbose bool) (files []string) {
 
 	for _, p := range folders {
 		f, err := RetrivesFilesFromUserPath(p, true, defaultScannedFileExtensions, true, verbose)
-		if err != nil && verbose {
-			log.Println(err)
+		if err != nil {
+			if verbose {
+				logMessage(LOG_INFO, err)
+			}
 			continue
 		}
 
@@ -165,7 +177,7 @@ func RetrivesFilesFromUserPath(path string, listFiles bool, includeFileExtension
 		} else {
 			err := filepath.Walk(path, func(walk string, info os.FileInfo, err error) error {
 				if err != nil && verbose {
-					log.Println("[ERROR]", err)
+					logMessage(LOG_ERROR, "[ERROR]", err)
 				}
 
 				if err == nil && !(info.IsDir() == listFiles) && (len(includeFileExtensions) == 0 || StringInSlice(filepath.Ext(walk), includeFileExtensions)) {
@@ -176,7 +188,7 @@ func RetrivesFilesFromUserPath(path string, listFiles bool, includeFileExtension
 			})
 
 			if err != nil && verbose {
-				log.Println("[ERROR]", err)
+				logMessage(LOG_ERROR, "[ERROR]", err)
 			}
 		}
 	}

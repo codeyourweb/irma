@@ -23,7 +23,7 @@ type ProcessInformation struct {
 }
 
 // MemoryAnalysisRoutine analyse processes memory every 5 seconds
-func MemoryAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+func MemoryAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, pInfiniteLoop bool, rules *yara.Rules) {
 	for {
 		// list process information and memory
 		procs := ListProcess(pVerbose)
@@ -33,13 +33,13 @@ func MemoryAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pNotifi
 			// dump processes memory and quit the program
 			if len(pDump) > 0 {
 				if err := WriteProcessMemoryToFile(pDump, proc.ProcessName+fmt.Sprint(proc.PID)+".dmp", proc.MemoryDump); err != nil && pVerbose {
-					log.Println("[ERROR]", err)
+					logMessage(LOG_ERROR, "[ERROR]", err)
 				}
 			}
 
 			// parsing kill queue
 			if StringInSlice(proc.ProcessPath, killQueue) && pKill {
-				log.Println("[INFO]", "KILLING PID", proc.PID)
+				logMessage(LOG_INFO, "[INFO]", "KILLING PID", proc.PID)
 				KillProcessByID(proc.PID, pVerbose)
 			} else {
 				// analyzing process memory and cleaning memory buffer
@@ -52,13 +52,16 @@ func MemoryAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pNotifi
 		}
 
 		if len(pDump) > 0 {
-			log.Println("[INFO] Processes memory dump completed - Exiting program.")
+			logMessage(LOG_INFO, "[INFO] Processes memory dump completed - Exiting program.")
 			os.Exit(0)
 		}
 
 		killQueue = nil
-
-		time.Sleep(5 * time.Second)
+		if !pInfiniteLoop {
+			break
+		} else {
+			time.Sleep(5 * time.Second)
+		}
 	}
 }
 
@@ -74,12 +77,12 @@ func ListProcess(verbose bool) (procsInfo []ProcessInformation) {
 		if procsIds[i] != 0 && procsIds[i] != uint32(runningPID) {
 			procHandle, err := GetProcessHandle(procsIds[i], windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_VM_READ)
 			if err != nil && verbose {
-				log.Println("[ERROR]", "PID", procsIds[i], err)
+				logMessage(LOG_ERROR, "[ERROR]", "PID", procsIds[i], err)
 			}
 
 			if err == nil && procHandle > 0 {
 				if proc, memdump, err := GetProcessMemory(procsIds[i], procHandle, verbose); err != nil && verbose {
-					log.Println("[ERROR]", err)
+					logMessage(LOG_ERROR, "[ERROR]", err)
 				} else {
 					if len(memdump) > 0 {
 						// return process memory only if it has changed since the last process scan
@@ -129,7 +132,7 @@ func GetProcessMemory(pid uint32, handle windows.Handle, verbose bool) (ProcessI
 func KillProcessByID(procID uint32, verbose bool) (err error) {
 	hProc, err := GetProcessHandle(procID, windows.PROCESS_QUERY_INFORMATION|windows.PROCESS_TERMINATE)
 	if err != nil && verbose {
-		log.Println("[ERROR]", "PID", procID, err)
+		logMessage(LOG_ERROR, "[ERROR]", "PID", procID, err)
 	}
 
 	exitCode := GetExitCodeProcess(hProc)
@@ -177,12 +180,12 @@ func GetProcessModulesHandles(procHandle windows.Handle) (processFilename string
 func DumpModuleMemory(procHandle windows.Handle, modHandle syscall.Handle, verbose bool) []byte {
 	moduleInfos, err := GetModuleInformation(procHandle, modHandle)
 	if err != nil && verbose {
-		log.Println("[ERROR]", err)
+		logMessage(LOG_ERROR, "[ERROR]", err)
 	}
 
 	memdump, err := ReadProcessMemory(procHandle, moduleInfos.BaseOfDll, uintptr(moduleInfos.SizeOfImage))
 	if err != nil && verbose {
-		log.Println("[ERROR]", err)
+		logMessage(LOG_ERROR, "[ERROR]", err)
 	}
 
 	memdump = bytes.Trim(memdump, "\x00")

@@ -4,7 +4,6 @@ import (
 	"crypto/rc4"
 	b64 "encoding/base64"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 	"runtime/debug"
@@ -30,23 +29,23 @@ func FileAnalysis(path string, pQuarantine string, pKill bool, pNotifications bo
 
 	if f, err = os.Stat(path); err != nil {
 		if pVerbose {
-			log.Println("[ERROR]", path, err)
+			logMessage(LOG_ERROR, "[ERROR]", path, err)
 		}
 	} else {
 		if RegisterFileInHistory(f, path, &filescanHistory, pVerbose) {
 
 			content, err = os.ReadFile(path)
 			if err != nil && pVerbose {
-				log.Println("[ERROR]", path, err)
+				logMessage(LOG_ERROR, "[ERROR]", path, err)
 			}
 
 			filetype, err := filetype.Match(content)
 			if err != nil && pVerbose {
-				log.Println("[ERROR]", path, err)
+				logMessage(LOG_ERROR, "[ERROR]", path, err)
 			}
 
 			if pVerbose {
-				log.Println("[INFO] ["+sourceIndex+"] Analyzing", path)
+				logMessage(LOG_INFO, "[INFO] ["+sourceIndex+"] Analyzing", path)
 			}
 
 			// cleaning memory if file size is greater than 512Mb
@@ -69,7 +68,7 @@ func FileAnalysis(path string, pQuarantine string, pKill bool, pNotifications bo
 
 				// logging
 				for _, match := range result {
-					log.Println("[ALERT]", "["+sourceIndex+"] YARA match", path, match.Namespace, match.Rule)
+					logMessage(LOG_INFO, "[ALERT]", "["+sourceIndex+"] YARA match", path, match.Namespace, match.Rule)
 				}
 
 				// kill
@@ -79,10 +78,10 @@ func FileAnalysis(path string, pQuarantine string, pKill bool, pNotifications bo
 
 				// dump matching file to quarantine
 				if len(pQuarantine) > 0 {
-					log.Println("[INFO]", "Dumping file", path)
+					logMessage(LOG_INFO, "[INFO]", "Dumping file", path)
 					err := QuarantineFile(path, pQuarantine)
 					if err != nil {
-						log.Println("[ERROR]", "Cannot quarantine file", path, err)
+						logMessage(LOG_ERROR, "[ERROR]", "Cannot quarantine file", path, err)
 					}
 				}
 			}
@@ -93,7 +92,7 @@ func FileAnalysis(path string, pQuarantine string, pKill bool, pNotifications bo
 // MemoryAnalysis sub-routine for running processes analysis
 func MemoryAnalysis(proc *ProcessInformation, pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
 	if pVerbose {
-		log.Println("[INFO] [MEMORY] Analyzing", proc.ProcessName, "PID:", proc.PID)
+		logMessage(LOG_INFO, "[INFO] [MEMORY] Analyzing", proc.ProcessName, "PID:", proc.PID)
 	}
 
 	result := PerformYaraScan(&proc.MemoryDump, rules, pVerbose)
@@ -105,21 +104,21 @@ func MemoryAnalysis(proc *ProcessInformation, pQuarantine string, pKill bool, pN
 
 		// logging
 		for _, match := range result {
-			log.Println("[ALERT]", "[MEMORY] YARA match", proc.ProcessName, "PID:", fmt.Sprint(proc.PID), match.Namespace, match.Rule)
+			logMessage(LOG_INFO, "[ALERT]", "[MEMORY] YARA match", proc.ProcessName, "PID:", fmt.Sprint(proc.PID), match.Namespace, match.Rule)
 		}
 
 		// dump matching process to quarantine
 		if len(pQuarantine) > 0 {
-			log.Println("[INFO]", "DUMPING PID", proc.PID)
+			logMessage(LOG_INFO, "[INFO]", "DUMPING PID", proc.PID)
 			err := QuarantineProcess(proc, pQuarantine)
 			if err != nil {
-				log.Println("[ERROR]", "Cannot quarantine PID", proc.PID, err)
+				logMessage(LOG_ERROR, "[ERROR]", "Cannot quarantine PID", proc.PID, err)
 			}
 		}
 
 		// killing process
 		if pKill {
-			log.Println("[INFO]", "KILLING PID", proc.PID)
+			logMessage(LOG_INFO, "[INFO]", "KILLING PID", proc.PID)
 			KillProcessByID(proc.PID, pVerbose)
 		}
 	}
@@ -166,7 +165,7 @@ func quarantineContent(content []byte, filename string, quarantinePath string) (
 		}
 	}
 
-	c, err := rc4.NewCipher([]byte("irma"))
+	c, err := rc4.NewCipher([]byte(quarantineKey))
 	if err != nil {
 		return err
 	}

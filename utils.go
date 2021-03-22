@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"os"
 
 	"github.com/gen2brain/beeep"
@@ -11,7 +10,7 @@ import (
 func RegisterFileInHistory(f os.FileInfo, path string, history *[]FileDescriptor, verbose bool) bool {
 	if int(f.Size()) > 1024*1024*maxFilesizeScan {
 		if verbose {
-			log.Println("[INFO]", path, "skipped - larger than", maxFilesizeScan, "Mb")
+			logMessage(LOG_INFO, "[INFO]", path, "skipped - larger than", maxFilesizeScan, "Mb")
 		}
 		return true
 	}
@@ -53,27 +52,27 @@ func NotifyUser(title string, message string) {
 // SpawnFakeProcesses drop fake analysis process
 func SpawnFakeProcesses(verbose bool) {
 	if err := SpawnFakeProcess("procmon.exe"); err != nil && verbose {
-		log.Println("[ERROR]", err)
+		logMessage(LOG_ERROR, "[ERROR]", err)
 	}
 	if err := SpawnFakeProcess("wireshark.exe"); err != nil && verbose {
-		log.Println("[ERROR]", err)
+		logMessage(LOG_ERROR, "[ERROR]", err)
 	}
 	if err := SpawnFakeProcess("tcpdump.exe"); err != nil && verbose {
-		log.Println("[ERROR]", err)
+		logMessage(LOG_ERROR, "[ERROR]", err)
 	}
 	if err := SpawnFakeProcess("sysmon.exe"); err != nil && verbose {
-		log.Println("[ERROR]", err)
+		logMessage(LOG_ERROR, "[ERROR]", err)
 	}
 	if err := SpawnFakeProcess("sysmon64.exe"); err != nil && verbose {
-		log.Println("[ERROR]", err)
+		logMessage(LOG_ERROR, "[ERROR]", err)
 	}
 	if err := SpawnFakeProcess("x86dbg.exe"); err != nil && verbose {
-		log.Println("[ERROR]", err)
+		logMessage(LOG_ERROR, "[ERROR]", err)
 	}
 	if err := SpawnFakeProcess("x64dbg.exe"); err != nil && verbose {
-		log.Println("[ERROR]", err)
+		logMessage(LOG_ERROR, "[ERROR]", err)
 	}
 	if err := SpawnFakeProcess("inetsim.exe"); err != nil && verbose {
-		log.Println("[ERROR]", err)
+		logMessage(LOG_ERROR, "[ERROR]", err)
 	}
 }

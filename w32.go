@@ -7,7 +7,16 @@ import (
 	"golang.org/x/sys/windows"
 )
 
+// Windows services constants
+const (
+	SVC_SC_ENUM_PROCESS_INFO = 0
+	SVC_SERVICE_WIN32        = 0x00000030
+	SVC_SERVICE_STATE_ALL    = 0x00000003
+	SVC_SERVICE_ACCEPT_STOP  = 0x00000001
+)
+
 var (
+	modAdvapi32                 = windows.NewLazySystemDLL("Advapi32.dll")
 	modkernel32                 = windows.NewLazySystemDLL("Kernel32.dll")
 	modpsapi                    = windows.NewLazySystemDLL("Psapi.dll")
 	procCreateMutex             = modkernel32.NewProc("CreateMutexW")
@@ -19,7 +28,30 @@ var (
 	procEnumProcessModules      = modpsapi.NewProc("EnumProcessModules")
 	procGetModuleFileNameEx     = modpsapi.NewProc("GetModuleFileNameExA")
 	procGetModuleInformation    = modpsapi.NewProc("GetModuleInformation")
+	procSvcEnumServicesStatusEx = modAdvapi32.NewProc("EnumServicesStatusExW")
 )
+
+// wrapper for WIN32 API ENUM_SERVICE_STATUS_PROCESSW structure
+// https://docs.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-enum_service_status_processw
+type ENUM_SERVICE_STATUS_PROCESS struct {
+	lpServiceName        *uint16
+	lpDisplayName        *uint16
+	ServiceStatusProcess SERVICE_STATUS_PROCESS
+}
+
+// wrapper for WIN32 API SERVICE_STATUS_PROCESS structure
+// https://docs.microsoft.com/en-us/windows/win32/api/winsvc/ns-winsvc-service_status_process
+type SERVICE_STATUS_PROCESS struct {
+	dwServiceType             uint32
+	dwCurrentState            uint32
+	dwControlsAccepted        uint32
+	dwWin32ExitCode           uint32
+	dwServiceSpecificExitCode uint32
+	dwCheckPoint              uint32
+	dwWaitHint                uint32
+	dwProcessId               uint32
+	dwServiceFlags            uint32
+}
 
 // SystemInfo structure contains information about the current computer system. This includes the architecture and type of the processor, the number of processors in the system, the page size, and other such information.
 // https://docs.microsoft.com/en-us/windows/win32/api/sysinfoapi/ns-sysinfoapi-system_info

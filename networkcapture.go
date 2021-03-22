@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"net"
 	"os"
 	"path/filepath"
@@ -18,7 +17,7 @@ import (
 func NetworkAnalysisRoutine(bpffilter string, filename string, verbose bool) {
 	// Check if WinPCAP installed
 	if _, err := os.Stat(os.Getenv("SystemRoot") + "\\System32\\wpcap.dll"); os.IsNotExist(err) {
-		log.Println("[ERROR] The network capture system requires the installation of WinPCAP on the workstation")
+		logMessage(LOG_ERROR, "[ERROR] The network capture system requires the installation of WinPCAP on the workstation")
 		return
 	}
 
@@ -38,14 +37,14 @@ func NetworkAnalysisRoutine(bpffilter string, filename string, verbose bool) {
 	_, err = os.Stat(filepath.Dir(filename))
 	if os.IsNotExist(err) {
 		if err := os.MkdirAll(filepath.Dir(filename), 0600); err != nil {
-			log.Println("[ERROR] Failed to create pcap file: ", err.Error())
+			logMessage(LOG_ERROR, "[ERROR] Failed to create pcap file: ", err.Error())
 			return
 		}
 	}
 
 	f, err := os.Create(filename)
 	if err != nil {
-		log.Println("[ERROR] Failed to create pcap file: ", err.Error())
+		logMessage(LOG_ERROR, "[ERROR] Failed to create pcap file: ", err.Error())
 		return
 	}
 	defer f.Close()
@@ -53,7 +52,7 @@ func NetworkAnalysisRoutine(bpffilter string, filename string, verbose bool) {
 	// listening for all interfaces
 	for _, iface := range ifaces {
 		if err := CaptureInterface(&iface, &devices, bpffilter, f, verbose); err != nil && verbose {
-			log.Println("[ERROR]", err)
+			logMessage(LOG_ERROR, "[ERROR]", err)
 		}
 	}
 }
@@ -79,7 +78,7 @@ func CaptureInterface(iface *net.Interface, devices *[]pcap.Interface, bpffilter
 		}
 	}
 
-	log.Printf("[INFO] Using network range %v for interface \"%v\"", addr, iface.Name)
+	fmt.Printf("[INFO] Using network range %v for interface \"%v\"", addr, iface.Name)
 
 	// Try to find a match between device and interface
 	var deviceName string

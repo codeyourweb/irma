@@ -31,32 +31,34 @@ _go-yara_ and CGO compilation. You'll find a detailed documentation [here](READM
 
 ### Usage 
 ```
-usage: irma [-h|--help] [-c|--network-capture "<value>"] [-b|--bpffilter
-            "<value>"] [-y|--yara-rules "<value>"] [-d|--dump "<value>"]
-            [-q|--quarantine "<value>"] [-k|--kill] [-f|--faker]
-            [-n|--notifications] [-v|--verbose] 
+usage: irma [-h|--help] -c|--configuration "<value>" [-b|--builder "<value>"]
 
             Incident Response - Minimal Analysis
 
 Arguments:
 
-  -h  --help             Print help information
-  -c  --network-capture  Capture network interface to PCAP file. Default:
-  -b  --bpffilter        Use Berkeley Packet Filter to capture only selected
-                         parts of network traffic. Default:
-  -y  --yara-rules       Yara rules path (the program will look for *.yar files
-                         recursively). Default: ./yara-signatures
-  -d  --dump             Dump all running process to the specified directory
-  -q  --quarantine       Specify path to store matching artefacts in quarantine
-                         (Base64/RC4 with key: irma)
-  -k  --kill             Kill suspicious process ID (without removing process
-                         binary)
-  -f  --faker            Spawn fake processes such as wireshark / procmon /
-                         procdump / x64dbg
-  -n  --notifications    Use Windows notifications when a file or memory stream
-                         match your YARA rules
-  -v  --verbose          Display every error and information messages
+  -h  --help           Print help information
+  -c  --configuration  yaml configuration file
+  -b  --builder        create a standalone launcher executable with packed
+                       rules and configuration.
+``` 
 
+### Scan according to your needs
+_IRMA_ embeds a configuration file in order to define which files to scan, and 
+wher eto scan them. 
+
+``` 
+irma.exe -c configuration.yaml
+``` 
+
+### EDR, rules and configuration packing
+_IRMA_ builder mode let you create a standalone, static compiled, self-extracting 
+archive. It contains irma binary, configuration file, and signatures. Hence, this 
+binary could be deployed on any other system and launch without additional 
+configuration.
+
+``` 
+irma.exe -c configuration.yaml -b irma-sfx-binary.exe
 ``` 
 
 ## About this project and future versions
@@ -66,10 +68,7 @@ memory on a Windows system. Initially focused on system oriented live forensics,
 i plan to enhance _IRMA_ functionalities with network based detection & analysis.
 
 Further versions may contains:
-* The ability to create a proxy
-* Complete or selected network packets dump
 * SNORT/Suricata rules analysis
-* Improved detection of system behaviors
 * Transfer of analysis results to a SIEM
 * Agent management platform - Command and control ability
 

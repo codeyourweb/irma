@@ -2,7 +2,6 @@ package main
 
 import (
 	"fmt"
-	"log"
 	"os"
 	"time"
 
@@ -11,12 +10,12 @@ import (
 )
 
 // StartMenuAnalysisRoutine analyse system artefacts every 15 seconds
-func StartMenuAnalysisRoutine(pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, rules *yara.Rules) {
+func StartMenuAnalysisRoutine(pQuarantine string, pKill bool, pNotifications bool, pVerbose bool, pInfiniteLoop bool, rules *yara.Rules) {
 	for {
 		lnk, errors := ListStartMenuLnkPersistence(pVerbose)
 		if errors != nil && pVerbose {
 			for _, err := range errors {
-				log.Println("[ERROR]", err)
+				logMessage(LOG_ERROR, "[ERROR]", err)
 			}
 		}
 
@@ -27,7 +26,11 @@ func StartMenuAnalysisRoutine(pQuarantine string, pKill bool, pNotifications boo
 			}
 		}
 
-		time.Sleep(15 * time.Second)
+		if !pInfiniteLoop {
+			break
+		} else {
+			time.Sleep(15 * time.Second)
+		}
 	}
 }
 

@@ -21,20 +21,21 @@ var (
 	memoryHashHistory    []string
 	killQueue            []string
 	exit                 = make(chan bool)
+	config               Configuration
 )
 
-var defaultScannedFileExtensions = []string{".txt", ".csv", ".htm", ".html", ".flv", ".f4v", ".avi", ".3gp", ".3g2", ".3gp2", ".3p2", ".divx", ".mp4", ".mkv", ".mov", ".qt", ".asf", ".wmv", ".rm", ".rmvb", ".vob", ".dat", ".mpg", ".mpeg", ".bik", ".fcs", ".mp3", ".mpeg3", ".flac", ".ape", ".ogg", ".aac", ".m4a", ".wma", ".ac3", ".wav", ".mka", ".rm", ".ra", ".ravb", ".mid", ".midi", ".cda", ".jpg", ".jpe", ".jpeg", ".jff", ".gif", ".png", ".bmp", ".tif", ".tiff", ".emf", ".wmf", ".eps", ".psd", ".cdr", ".swf", ".exe", ".lnk", ".dll", ".ps1", ".scr", ".ocx", ".com", ".sys", ".class", ".o", ".so", ".elf", ".prx", ".vb", ".vbs", ".js", ".bat", ".cmd", ".msi", ".msp", ".deb", ".rpm", ".sh", ".pl", ".dylib", ".doc", ".dot", ".docx", ".dotx", ".docm", ".dotm", ".xsl", ".xls", ".xlsx", ".xltx", ".xlsm", ".xltm", ".xlam", ".xlsb", ".ppt", ".pot", ".pps", ".pptx", ".potx", ".pptm", ".potm", ".ppsx", ".ppsm", ".rtf", ".pdf", ".msg", ".eml", ".vsd", ".vss", ".vst", ".vdx", ".vsx", ".vtx", ".xps", ".oxps", ".one", ".onepkg", ".xsn", ".odt", ".ods", ".odp", ".sxw", ".pub", ".mdb", ".accdb", ".accde", ".accdr", ".accdc", ".chm", ".mht", ".zip", ".7z", ".7-z", ".rar", ".iso", ".cab", ".jar", ".arj", ".dmg", ".smi", ".img", ".xar"}
-var archivesFormats = []string{"application/x-7z-compressed", "application/zip", "application/vnd.rar"}
-var maxFilesizeScan = 1024
-var cleanIfFileSizeGreaterThan = 512
+var defaultScannedFileExtensions = []string{}
+var maxFilesizeScan int
+var cleanIfFileSizeGreaterThan int
+var quarantineKey string
+var archivesFormats = []string{"application/x-tar", "application/x-7z-compressed", "application/zip", "application/vnd.rar"}
 
 func main() {
 	var err error
-	log.SetOutput(os.Stdout)
 
 	// create mutex to avoid program running multiple instances
 	if _, err = CreateMutex("irmaBinMutex"); err != nil {
-		log.Println("Only one instance or irma can be launched")
+		logMessage(LOG_ERROR, "Only one instance or irma can be launched")
 		os.Exit(1)
 	}
 
@@ -43,70 +44,127 @@ func main() {
 	signal.Notify(c, os.Interrupt)
 	go func() {
 		for sig := range c {
-			log.Printf("captured %v, stopping irma and exiting..", sig)
+			fmt.Printf("[INFO] captured %v, stopping irma and exiting..", sig)
 			exit <- true
 		}
 	}()
 
+	// parse arguments
 	parser := argparse.NewParser("irma", "Incident Response - Minimal Analysis")
-	pNetworkCapturePath := parser.String("c", "network-capture", &argparse.Options{Required: false, Default: "", Help: "Capture network interface to PCAP file"})
-	pBpfFilter := parser.String("b", "bpffilter", &argparse.Options{Required: false, Default: "", Help: "Use Berkeley Packet Filter to capture only selected parts of network traffic"})
-	pYaraPath := parser.String("y", "yara-rules", &argparse.Options{Required: false, Default: "./yara-signatures", Help: "Yara rules path (the program will look for *.yar files recursively)"})
-	pDump := parser.String("d", "dump", &argparse.Options{Required: false, Help: "Dump all running process to the specified directory"})
-	pQuarantine := parser.String("q", "quarantine", &argparse.Options{Required: false, Help: "Specify path to store matching artefacts in quarantine (Base64/RC4 with key: irma)"})
-	pKill := parser.Flag("k", "kill", &argparse.Options{Required: false, Help: "Kill suspicious process ID (without removing process binary)"})
-	pFaker := parser.Flag("f", "faker", &argparse.Options{Required: false, Help: "Spawn fake processes such as wireshark / procmon / procdump / x64dbg"})
-	pNotifications := parser.Flag("n", "notifications", &argparse.Options{Required: false, Help: "Use Windows notifications when a file or memory stream match your YARA rules"})
-	pVerbose := parser.Flag("v", "verbose", &argparse.Options{Required: false, Help: "Display every error and information messages"})
+	pConfigurationFile := parser.String("c", "configuration", &argparse.Options{Required: true, Default: "configuration.yaml", Help: "yaml configuration file"})
+	pBuilder := parser.String("b", "builder", &argparse.Options{Required: false, Default: "", Help: "create a standalone launcher executable with packed rules and configuration"})
 
 	err = parser.Parse(os.Args)
 	if err != nil {
 		fmt.Print(parser.Usage(err))
 	}
 
+	// read configuration file
+	config.getConfiguration(*pConfigurationFile)
+	if len(*pBuilder) > 0 {
+		BuildSFX(config.Yara.Path, config.Yara.Rulesrc4key, config, *pBuilder)
+		os.Exit(0)
+	}
+
+	maxFilesizeScan = config.Advancedparameters.MaxScanFilesize
+	cleanIfFileSizeGreaterThan = config.Advancedparameters.CleanMemoryIfFileGreaterThanSize
+	defaultScannedFileExtensions = config.Advancedparameters.Extensions
+	quarantineKey = config.Response.QuarantineRC4Key
+
 	// Retrieve current user permissions
 	admin, elevated := CheckCurrentUserPermissions()
 	if !admin && !elevated {
-		log.Println("[WARNING] IRMA is not running with admin righs. Notice that the analysis will be partial and limited to the current user scope")
+		logMessage(LOG_INFO, "[WARNING] IRMA is not running with admin righs. Notice that the analysis will be partial and limited to the current user scope")
 		time.Sleep(5 * time.Second)
 	}
 
 	// spawn fake analysis processes (this binary is just a 10 seconds sleep infinite loop)
-	if *pFaker {
-		SpawnFakeProcesses(*pVerbose)
+	if config.Others.FakeProcesses {
+		SpawnFakeProcesses(config.Output.Verbose)
 	}
 
 	// load yara signature
-	log.Println("[INIT] Starting IRMA")
-	yaraPath := *pYaraPath
-	yaraFiles := SearchForYaraFiles(yaraPath, *pVerbose)
-	compiler, err := LoadYaraRules(yaraFiles, *pVerbose)
+	logMessage(LOG_INFO, "[INIT] Starting IRMA")
+	yaraPath := config.Yara.Path
+	yaraFiles := SearchForYaraFiles(yaraPath, config.Output.Verbose)
+	compiler, err := LoadYaraRules(yaraFiles, config.Yara.Rulesrc4key, config.Output.Verbose)
 	if err != nil {
-		log.Fatal(err)
+		logMessage(LOG_ERROR, err)
 	}
 
 	if len(yaraFiles) == 0 {
-		log.Fatal("No YARA rule found - Please add *.yar in " + *pYaraPath + " folder")
+		logMessage(LOG_ERROR, "[ERROR] No YARA rule found - Please add *.yar in "+config.Yara.Path+" folder")
 	}
 
-	log.Println("[INIT] Loading ", len(yaraFiles), "YARA files")
+	logMessage(LOG_INFO, "[INIT] Loading ", len(yaraFiles), "YARA files")
 
 	// compile yara rules
 	rules, err := CompileRules(compiler)
 	if err != nil {
-		log.Fatal(err)
+		logMessage(LOG_ERROR, err)
 	}
-	log.Println("[INIT]", len(rules.GetRules()), "YARA rules compiled")
-	log.Println("[INFO] Start scanning Memory / Registry / StartMenu / Task Scheduler / Filesystem")
-	if len(*pNetworkCapturePath) > 0 {
-		go NetworkAnalysisRoutine(*pBpfFilter, *pNetworkCapturePath, *pVerbose)
+	logMessage(LOG_INFO, "[INIT]", len(rules.GetRules()), "YARA rules compiled")
+
+	if config.Network.Capture {
+		logMessage(LOG_INFO, "[INFO] Start network capture")
+		go NetworkAnalysisRoutine(config.Network.Bpffilter, config.Network.Pcapfile, config.Output.Verbose)
 	}
-	go MemoryAnalysisRoutine(*pDump, *pQuarantine, *pKill, *pNotifications, *pVerbose, rules)
-	go RegistryAnalysisRoutine(*pQuarantine, *pKill, *pNotifications, *pVerbose, rules)
-	go StartMenuAnalysisRoutine(*pQuarantine, *pKill, *pNotifications, *pVerbose, rules)
-	go TaskSchedulerAnalysisRoutine(*pQuarantine, *pKill, *pNotifications, *pVerbose, rules)
-	go WindowsFileSystemAnalysisRoutine(*pQuarantine, *pKill, *pNotifications, *pVerbose, rules)
-	go UserFileSystemAnalysisRoutine(*pQuarantine, *pKill, *pNotifications, *pVerbose, rules)
+
+	if config.Yarascan.Memory {
+		logMessage(LOG_INFO, "[INFO] Start scanning memory")
+		go MemoryAnalysisRoutine(config.Response.DumpDirectory, config.Response.QuarantineDirectory, config.Response.Kill, config.Output.Notifications, config.Output.Verbose, config.Yarascan.InfiniteScan, rules)
+	}
+
+	if config.Yarascan.Registry {
+		logMessage(LOG_INFO, "[INFO] Start scanning registry")
+		go RegistryAnalysisRoutine(config.Response.QuarantineDirectory, config.Response.Kill, config.Output.Notifications, config.Output.Verbose, config.Yarascan.InfiniteScan, rules)
+	}
+
+	if config.Yarascan.Startmenu {
+		logMessage(LOG_INFO, "[INFO] Start scanning startmenu")
+		go StartMenuAnalysisRoutine(config.Response.QuarantineDirectory, config.Response.Kill, config.Output.Notifications, config.Output.Verbose, config.Yarascan.InfiniteScan, rules)
+	}
+
+	if config.Yarascan.Taskscheduler {
+		logMessage(LOG_INFO, "[INFO] Start scanning tasks scheduler")
+		go TaskSchedulerAnalysisRoutine(config.Response.QuarantineDirectory, config.Response.Kill, config.Output.Notifications, config.Output.Verbose, config.Yarascan.InfiniteScan, rules)
+	}
+
+	if config.Yarascan.Userfilesystem {
+		logMessage(LOG_INFO, "[INFO] Start scanning user filesystem")
+		go UserFileSystemAnalysisRoutine(config.Response.QuarantineDirectory, config.Response.Kill, config.Output.Notifications, config.Output.Verbose, config.Yarascan.InfiniteScan, rules)
+	}
+
+	if config.Yarascan.SystemDrive {
+		logMessage(LOG_INFO, "[INFO] Start scanning system drive")
+		go WindowsFileSystemAnalysisRoutine(config.Response.QuarantineDirectory, config.Response.Kill, config.Output.Notifications, config.Output.Verbose, config.Yarascan.InfiniteScan, rules)
+	}
+
+	for _, p := range config.Yarascan.AbsolutePaths {
+		logMessage(LOG_INFO, "[INFO] Start scanning "+p)
+		go func(path string) {
+			for {
+				files, err := RetrivesFilesFromUserPath(path, true, defaultScannedFileExtensions, config.Yarascan.AbsolutePathsRecursive, config.Output.Verbose)
+				if err != nil {
+					if config.Output.Verbose {
+						logMessage(LOG_ERROR, err)
+					}
+					break
+				}
+
+				for _, f := range files {
+					FileAnalysis(f, config.Response.QuarantineDirectory, config.Response.Kill, config.Output.Notifications, config.Output.Verbose, rules, "CUSTOMSCAN")
+				}
+
+				if !config.Yarascan.InfiniteScan {
+					break
+				} else {
+					time.Sleep(60 * time.Second)
+				}
+			}
+		}(p)
+	}
+
 	<-exit
 
 }
