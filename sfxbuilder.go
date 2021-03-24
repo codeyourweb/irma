@@ -4,7 +4,8 @@ import (
 	"archive/zip"
 	"bytes"
 	"crypto/rc4"
-	b64 "encoding/base64"
+	_ "embed"
+	"fmt"
 	"io"
 	"log"
 	"os"
@@ -13,15 +14,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+//go:embed resources/winrar_sfx.exe
+var sfxBinary []byte
+
 func BuildSFX(yaraPath string, rc4key string, config Configuration, outputSfxExe string) error {
 	// compress inputDirectory into archive
 	archive := recursiveCompressFolder(yaraPath, rc4key, config)
-
-	// embed winrar-zipsfx binary
-	sDec, err := b64.StdEncoding.DecodeString(sfxBinary)
-	if err != nil {
-		return err
-	}
 
 	file, err := os.Create(outputSfxExe)
 	if err != nil {
@@ -29,7 +27,9 @@ func BuildSFX(yaraPath string, rc4key string, config Configuration, outputSfxExe
 	}
 
 	defer file.Close()
-	file.Write([]byte(sDec))
+
+	// pack sfx binary and customized archive together
+	file.Write(sfxBinary)
 	file.Write(archive.Bytes())
 
 	return nil
@@ -103,10 +103,23 @@ func recursiveCompressFolder(yaraPath string, rc4key string, config Configuratio
 	}
 
 	// sfx comment
+	var b2i int = 0
+	if config.Sfx.SilentMode {
+		b2i = 1
+	}
 	var sfxcomment = "the comment below contains sfx script commands\r\n\r\n" +
-		"Path=%temp%\r\n" +
-		"Setup=irma.exe -c configuration.yaml\r\n" +
-		"Silent=1\r\n" +
+		"Path=" + config.Sfx.ExtractDirectory + "\r\n"
+
+	if config.Sfx.Autoexec {
+		sfxcomment += "Setup=irma.exe -c configuration.yaml"
+	}
+
+	if len(config.Sfx.LogFile) > 0 {
+		sfxcomment += " -o \"" + config.Sfx.LogFile + "\""
+	}
+
+	sfxcomment += "\r\n" +
+		"Silent=" + fmt.Sprint(b2i) + "\r\n" +
 		"Overwrite=1"
 
 	archive.SetComment(sfxcomment)

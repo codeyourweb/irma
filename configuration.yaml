@@ -23,6 +23,11 @@ network:
 output:
     notifications: true                   # use Windows 10 notification panel when processes memory or files trigger a yara rule match 
     verbose: true                         # verbose console output (yara match does not need this option)
+sfx:
+    autoexec: true                        # auto execute irma after unzipping
+    silentmode: true                      # prompt user to let him choose where to extract irma
+    extractDirectory: "%temp%"            # default zip extract directory
+    logfile: "irma.log"                   # output irma log to the following filepath
 others:
     fakeProcesses: false                  # spawn and execute fake analysis process to mislead malware and make it stop if anti-debug is analysed
 advancedparameters:

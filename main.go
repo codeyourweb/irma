@@ -6,6 +6,7 @@ package main
 
 import (
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -53,6 +54,7 @@ func main() {
 	parser := argparse.NewParser("irma", "Incident Response - Minimal Analysis")
 	pConfigurationFile := parser.String("c", "configuration", &argparse.Options{Required: true, Default: "configuration.yaml", Help: "yaml configuration file"})
 	pBuilder := parser.String("b", "builder", &argparse.Options{Required: false, Default: "", Help: "create a standalone launcher executable with packed rules and configuration"})
+	pLog := parser.String("o", "outfile", &argparse.Options{Required: false, Default: "", Help: "save log informations inside the specified file path"})
 
 	err = parser.Parse(os.Args)
 	if err != nil {
@@ -70,6 +72,26 @@ func main() {
 	cleanIfFileSizeGreaterThan = config.Advancedparameters.CleanMemoryIfFileGreaterThanSize
 	defaultScannedFileExtensions = config.Advancedparameters.Extensions
 	quarantineKey = config.Response.QuarantineRC4Key
+
+	// log inside a file
+	if len(*pLog) > 0 {
+		f, err := os.OpenFile(*pLog, os.O_RDWR|os.O_CREATE|os.O_TRUNC, 0666)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		out := os.Stdout
+		mw := io.MultiWriter(out, f)
+		r, w, _ := os.Pipe()
+
+		os.Stdout = w
+		os.Stderr = w
+
+		go func() {
+			_, _ = io.Copy(mw, r)
+		}()
+
+	}
 
 	// Retrieve current user permissions
 	admin, elevated := CheckCurrentUserPermissions()

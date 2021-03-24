@@ -38,6 +38,12 @@ type Configuration struct {
 		Notifications bool `yaml:"notifications"`
 		Verbose       bool `yaml:"verbose"`
 	}
+	Sfx struct {
+		Autoexec         bool   `yaml:"autoexec"`
+		SilentMode       bool   `yaml:"silentmode"`
+		ExtractDirectory string `yaml:"extractDirectory"`
+		LogFile          string `yaml:"logfile"`
+	}
 	Others struct {
 		FakeProcesses bool `yaml:"fakeProcesses"`
 	}
