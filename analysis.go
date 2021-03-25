@@ -1,6 +1,7 @@
 package main
 
 import (
+	"crypto/md5"
 	"crypto/rc4"
 	b64 "encoding/base64"
 	"fmt"
@@ -45,7 +46,7 @@ func FileAnalysis(path string, pQuarantine string, pKill bool, pNotifications bo
 			}
 
 			if pVerbose {
-				logMessage(LOG_INFO, "[INFO] ["+sourceIndex+"] Analyzing", path)
+				logMessage(LOG_INFO, "[INFO] ["+sourceIndex+"] Analyzing", path, fmt.Sprintf("%x", md5.Sum(content)))
 			}
 
 			// cleaning memory if file size is greater than 512Mb

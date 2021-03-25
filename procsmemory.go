@@ -58,6 +58,7 @@ func MemoryAnalysisRoutine(pDump string, pQuarantine string, pKill bool, pNotifi
 
 		killQueue = nil
 		if !pInfiniteLoop {
+			wg.Done()
 			break
 		} else {
 			time.Sleep(5 * time.Second)

@@ -36,6 +36,7 @@ func RegistryAnalysisRoutine(pQuarantine string, pKill bool, pNotifications bool
 		}
 
 		if !pInfiniteLoop {
+			wg.Done()
 			break
 		} else {
 			time.Sleep(15 * time.Second)

@@ -10,6 +10,7 @@ import (
 	"log"
 	"os"
 	"os/signal"
+	"sync"
 	"time"
 
 	"github.com/akamensky/argparse"
@@ -30,6 +31,7 @@ var maxFilesizeScan int
 var cleanIfFileSizeGreaterThan int
 var quarantineKey string
 var archivesFormats = []string{"application/x-tar", "application/x-7z-compressed", "application/zip", "application/vnd.rar"}
+var wg sync.WaitGroup
 
 func main() {
 	var err error
@@ -128,36 +130,43 @@ func main() {
 	logMessage(LOG_INFO, "[INIT]", len(rules.GetRules()), "YARA rules compiled")
 
 	if config.Network.Capture {
+		wg.Add(1)
 		logMessage(LOG_INFO, "[INFO] Start network capture")
 		go NetworkAnalysisRoutine(config.Network.Bpffilter, config.Network.Pcapfile, config.Output.Verbose)
 	}
 
 	if config.Yarascan.Memory {
+		wg.Add(1)
 		logMessage(LOG_INFO, "[INFO] Start scanning memory")
 		go MemoryAnalysisRoutine(config.Response.DumpDirectory, config.Response.QuarantineDirectory, config.Response.Kill, config.Output.Notifications, config.Output.Verbose, config.Yarascan.InfiniteScan, rules)
 	}
 
 	if config.Yarascan.Registry {
+		wg.Add(1)
 		logMessage(LOG_INFO, "[INFO] Start scanning registry")
 		go RegistryAnalysisRoutine(config.Response.QuarantineDirectory, config.Response.Kill, config.Output.Notifications, config.Output.Verbose, config.Yarascan.InfiniteScan, rules)
 	}
 
 	if config.Yarascan.Startmenu {
+		wg.Add(1)
 		logMessage(LOG_INFO, "[INFO] Start scanning startmenu")
 		go StartMenuAnalysisRoutine(config.Response.QuarantineDirectory, config.Response.Kill, config.Output.Notifications, config.Output.Verbose, config.Yarascan.InfiniteScan, rules)
 	}
 
 	if config.Yarascan.Taskscheduler {
+		wg.Add(1)
 		logMessage(LOG_INFO, "[INFO] Start scanning tasks scheduler")
 		go TaskSchedulerAnalysisRoutine(config.Response.QuarantineDirectory, config.Response.Kill, config.Output.Notifications, config.Output.Verbose, config.Yarascan.InfiniteScan, rules)
 	}
 
 	if config.Yarascan.Userfilesystem {
+		wg.Add(1)
 		logMessage(LOG_INFO, "[INFO] Start scanning user filesystem")
 		go UserFileSystemAnalysisRoutine(config.Response.QuarantineDirectory, config.Response.Kill, config.Output.Notifications, config.Output.Verbose, config.Yarascan.InfiniteScan, rules)
 	}
 
 	if config.Yarascan.SystemDrive {
+		wg.Add(1)
 		logMessage(LOG_INFO, "[INFO] Start scanning system drive")
 		go WindowsFileSystemAnalysisRoutine(config.Response.QuarantineDirectory, config.Response.Kill, config.Output.Notifications, config.Output.Verbose, config.Yarascan.InfiniteScan, rules)
 	}
@@ -165,6 +174,7 @@ func main() {
 	for _, p := range config.Yarascan.AbsolutePaths {
 		logMessage(LOG_INFO, "[INFO] Start scanning "+p)
 		go func(path string) {
+			wg.Add(1)
 			for {
 				files, err := RetrivesFilesFromUserPath(path, true, defaultScannedFileExtensions, config.Yarascan.AbsolutePathsRecursive, config.Output.Verbose)
 				if err != nil {
@@ -179,6 +189,7 @@ func main() {
 				}
 
 				if !config.Yarascan.InfiniteScan {
+					wg.Done()
 					break
 				} else {
 					time.Sleep(60 * time.Second)
@@ -187,8 +198,9 @@ func main() {
 		}(p)
 	}
 
-	<-exit
-
+	// Exit program when all goroutines have ended
+	wg.Wait()
+	os.Exit(0)
 }
 
 // CheckCurrentUserPermissions retieves the current user permissions and check if the program run with elevated privileges

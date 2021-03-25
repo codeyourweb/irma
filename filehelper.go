@@ -26,6 +26,7 @@ func WindowsFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pNotificat
 		}
 
 		if !pInfiniteLoop {
+			wg.Done()
 			break
 		} else {
 			time.Sleep(300 * time.Second)
@@ -43,6 +44,7 @@ func UserFileSystemAnalysisRoutine(pQuarantine string, pKill bool, pNotification
 		}
 
 		if !pInfiniteLoop {
+			wg.Done()
 			break
 		} else {
 			time.Sleep(60 * time.Second)

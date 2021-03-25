@@ -28,6 +28,7 @@ func StartMenuAnalysisRoutine(pQuarantine string, pKill bool, pNotifications boo
 		}
 
 		if !pInfiniteLoop {
+			wg.Done()
 			break
 		} else {
 			time.Sleep(15 * time.Second)
