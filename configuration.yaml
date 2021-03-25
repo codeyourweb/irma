@@ -1,6 +1,6 @@
 yara:
     path: "yara-signatures/"              # yara rules absolute or relative folder (files have to end wih *.yar) 
-    rulesRC4Key: ""                   # yara rules can be ciphered with rc4 
+    rulesRC4Key: ""                       # yara rules can be ciphered with rc4 
 yarascan:
     infinitescan: true                    # loop scan infinitely
     memory: true                          # scan process memory

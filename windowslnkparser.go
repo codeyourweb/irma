@@ -3,6 +3,7 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/hillu/go-yara/v4"
@@ -40,13 +41,15 @@ func ListStartMenuFolders(verbose bool) (startMenu []string, err error) {
 
 	startMenu = append(startMenu, os.Getenv("SystemDrive")+`\ProgramData\Microsoft\Windows\Start Menu\Programs\StartUp`)
 
-	usersDir, err = RetrivesFilesFromUserPath(os.Getenv("SystemDrive")+`\Users`, false, nil, false, verbose)
+	usersDir, err = RetrivesFilesFromUserPath(os.Getenv("SystemDrive")+"\\Users", false, nil, false, verbose)
 	if err != nil {
 		return startMenu, err
 	}
 
 	for _, uDir := range usersDir {
-		startMenu = append(startMenu, uDir+`\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup`)
+		if !strings.HasSuffix(uDir, "Public") && !strings.HasSuffix(uDir, "Default") {
+			startMenu = append(startMenu, uDir+`\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup`)
+		}
 	}
 
 	return startMenu, err

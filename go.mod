@@ -15,7 +15,7 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/parsiya/golnk v0.0.0-20200515071614-5db3107130ce
 	github.com/rivo/uniseg v0.2.0 // indirect
-	golang.org/x/net v0.0.0-20210316092652-d523dce5a7f4 // indirect
-	golang.org/x/sys v0.0.0-20210320140829-1e4c9ba3b0c4
+	golang.org/x/net v0.0.0-20210324205630-d1beb07c2056 // indirect
+	golang.org/x/sys v0.0.0-20210324051608-47abb6519492
 	gopkg.in/yaml.v3 v3.0.0-20210107192922-496545a6307b
 )
