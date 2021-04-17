@@ -1,11 +1,11 @@
 
 # Installing IRMA on Windows
 
-_IRMA_ can be installed on a Windows platform but it's a little bit tricky cause it's strongly dependant of go-yara and CGO. Here's a little documentation to guide you step by step: 
+_IRMA_ can be installed on a Windows platform but it's a little bit tricky because it's strongly dependant of go-yara and CGO. Here's a little step by step guide: 
 
 ## Before installation
 
-All the installation process will be done with msys2/mingw terminal. In order to avoid any error, you have to ensure that your installation directories don't contains space or special characters. I haven't tested to install as a simple user, i strongly advise you to install everything with admin privileges on top of your c:\ drive.
+All the installation process will be done with msys2/mingw terminal. In order to avoid any error, you have to ensure that your installation directories don't contains space or special characters. I haven't tested to install as a simple user, I strongly advise you to install everything with admin privileges on top of your c:\ drive.
 
 For the configurations and examples below, my install paths are:
 
@@ -16,7 +16,7 @@ For the configurations and examples below, my install paths are:
 
 ## Install msys2 and dependencies:
 
-First of all, note that you won't be able to get _IRMA_ working if the dependencies are compiled with another compilator than GCC. There is currently some problems with CGO when external libraries are compiled with Visual C++, so no need to install Visual Studio or vcpkg.
+First of all, note that you won't be able to get _IRMA_ working if the dependencies are compiled with another compiler than GCC. There is currently some problems with CGO when external libraries are compiled with Visual C++, so no need to install Visual Studio or vcpkg.
 
 * Download msys2 [from the official website](https://www.msys2.org/) and install it
 * there, you will find two distincts binaries shorcut "MSYS2 MSYS" and "MSYS2 MinGW 64bits". Please launch this second one.
@@ -25,18 +25,18 @@ First of all, note that you won't be able to get _IRMA_ working if the dependenc
 
 ## Download and compile libyara
 
-It's strongly adviced NOT to clone VirusTotal's YARA repository but download the source code of the latest release. If you compile libyara from the latest commit, it could generate some side effect when linking this library with _IRMA_ and GCO.
+It's strongly advised NOT to clone VirusTotal's YARA repository but to download the source code of the latest release. If you compile libyara from the latest commit, it could generate some side effects when linking this library with _IRMA_ and GCO.
 
-* Download latest VirusTotal release source [from here](https://github.com/VirusTotal/yara/releases)
+* download latest VirusTotal release source [from here](https://github.com/VirusTotal/yara/releases)
 * unzip the folder in a directory without space and special char
 * in mingw terminal, go to yara directory (backslash have to be replace with slash eg. cd c:/yara)
 * compile and install using the following command: `./bootstrap.sh &&./configure && make && make install`  
 
 ## Configure your OS
 
-With this step, you won't need to launch use mingw terminal anymore and you will be able to use Go to install _IRMA_ and compile your projects directly from Windows cmd / powershell.
+With this step, you won't need to use mingw terminal anymore and you will be able to use Go to install _IRMA_ and compile your projects directly from Windows cmd / powershell.
 
-Ensure to have the following as system environment variables (not user env vars. If not, create them:
+Make sure you have the following as system environment variables (not user env vars). If not, create them:
 ```
 GOARCH=<your-architecture> (eg. amd64)
 GOOS=windows
@@ -46,11 +46,11 @@ PKG_CONFIG_PATH=C:/msys64/mingw64/lib/pkgconfig
 ```
 You also need C:\msys64\mingw64\bin in your system PATH env vars.
 
-Ensure you have got the following user environment var (not system not):
+Make sure you have got the following user environment var (not system var):
 
     GOPATH=%USERPROFILE%\go
 
-Note that paths be written with slashs and not backslash. As i already said, don't use path with spaces or special characters.
+Note that paths must be written with slashs and not backslash. As already said, don't use path with spaces or special characters.
 
 ## Download, Install and compile IRMA
 Now, from Windows cmd or Powershell, you can install _IRMA_: `go get github.com/codeyourweb/irma`
