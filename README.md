@@ -6,7 +6,7 @@
 _IRMA_ is a lightweight tool made for live forensics on Windows Platform. It is 
 focused on three use cases:
 * enpoint detection - live analysis, quarantine and eradication of malware on a workstation 
-* live analysis & sandbox host - logging and instant notifications for malware TTP's assesment
+* live analysis & sandbox host - logging and instant notifications for malware TTP's assessment
 * signatures quality test - scan your endpoint baseline and check for false positives
 
 ## How IRMA scan for malware behaviour?
@@ -21,7 +21,7 @@ Currently, _IRMA_ is able to:
 * list running processes and log for suspiscious actions
 * list common persistence mecanisms (registry keys / scheduled tasks / startup folder links)
 * perform YARA scan on files and memory
-* dump / quarantine suspiscious artefacs
+* dump / quarantine suspiscious artefacts
 * spawn fake analysis processes to make the computer look like an analysis platform
 
 ### Installation 
@@ -45,14 +45,14 @@ Arguments:
 
 ### Scan according to your needs
 _IRMA_ embeds a configuration file in order to define which files to scan, and 
-wher eto scan them. 
+where to scan them. 
 
 ``` 
 irma.exe -c configuration.yaml
 ``` 
 
 ### EDR, rules and configuration packing
-_IRMA_ builder mode let you create a standalone, static compiled, self-extracting 
+_IRMA_ builder mode lets you create a standalone, static compiled, self-extracting 
 archive. It contains irma binary, configuration file, and signatures. Hence, this 
 binary could be deployed on any other system and launch without additional 
 configuration.
@@ -65,7 +65,7 @@ irma.exe -c configuration.yaml -b irma-sfx-binary.exe
 I undertook this project initially in order to learn Go. Then little by little 
 I tried to understand how to use the Win32 API and finally to read the process 
 memory on a Windows system. Initially focused on system oriented live forensics, 
-i plan to enhance _IRMA_ functionalities with network based detection & analysis.
+I plan to enhance _IRMA_ functionalities with network based detection & analysis.
 
 Further versions may contains:
 * SNORT/Suricata rules analysis
