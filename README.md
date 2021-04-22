@@ -1,5 +1,3 @@
-[![Project Status](https://img.shields.io/badge/status-BETA-yellow?style=flat-square)]()
-
 # IRMA - Incident Response - Minimal Analysis
 
 ## What is this project designed for?
